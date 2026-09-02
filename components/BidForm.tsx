@@ -16,11 +16,30 @@ type RazorpayOptions = {
   name: string;
   description: string;
   order_id: string;
+
+  config?: {
+    display: {
+      blocks: {
+        payment_methods: {
+          name: string;
+          instruments: {
+            method: "upi" | "card";
+          }[];
+        };
+      };
+      sequence: string[];
+      preferences: {
+        show_default_blocks: boolean;
+      };
+    };
+  };
+
   handler: (response: {
     razorpay_payment_id: string;
     razorpay_order_id: string;
     razorpay_signature: string;
   }) => void;
+
   modal?: {
     ondismiss?: () => void;
   };
@@ -44,8 +63,7 @@ export default function BidForm({
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const minimumBid =
-    Math.floor(Number(currentBid)) + 1;
+  const minimumBid = Math.floor(Number(currentBid)) + 1;
 
   const loadRazorpay = async () => {
     const existingRazorpay = (
@@ -59,8 +77,7 @@ export default function BidForm({
     }
 
     return new Promise<boolean>((resolve) => {
-      const script =
-        document.createElement("script");
+      const script = document.createElement("script");
 
       script.src =
         "https://checkout.razorpay.com/v1/checkout.js";
@@ -91,9 +108,7 @@ export default function BidForm({
       !Number.isFinite(bidAmount) ||
       bidAmount <= 0
     ) {
-      setError(
-        "Please enter a valid bid amount."
-      );
+      setError("Please enter a valid bid amount.");
       return;
     }
 
@@ -174,9 +189,7 @@ export default function BidForm({
       const latestCurrentBid =
         Number(listing.current_bid);
 
-      if (
-        !Number.isFinite(latestCurrentBid)
-      ) {
+      if (!Number.isFinite(latestCurrentBid)) {
         setError(
           "Unable to verify the current bid."
         );
@@ -266,79 +279,108 @@ export default function BidForm({
           `Bid for ${orderData.businessName}`,
         order_id: orderData.orderId,
 
-        handler: async (response) => {
-  try {
-    setSuccess(
-      "Payment received. Verifying your bid..."
-    );
+        // =================================================
+        // ONLY UPI + CARD
+        // =================================================
+        config: {
+          display: {
+            blocks: {
+              payment_methods: {
+                name: "Pay via UPI or Card",
+                instruments: [
+                  {
+                    method: "upi",
+                  },
+                  {
+                    method: "card",
+                  },
+                ],
+              },
+            },
 
-    const verifyResponse =
-      await fetch(
-        "/api/bids/verify-payment",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
+            sequence: [
+              "block.payment_methods",
+            ],
+
+            preferences: {
+              show_default_blocks: false,
+            },
           },
-          body: JSON.stringify({
-            paymentOrderId:
-              orderData.paymentOrderId,
-            razorpay_payment_id:
-              response.razorpay_payment_id,
-            razorpay_order_id:
-              response.razorpay_order_id,
-            razorpay_signature:
-              response.razorpay_signature,
-          }),
-        }
-      );
+        },
 
-    const verifyData =
-      await verifyResponse.json();
+        handler: async (response) => {
+          try {
+            setSuccess(
+              "Payment received. Verifying your bid..."
+            );
 
-    if (
-      !verifyResponse.ok ||
-      !verifyData?.success
-    ) {
-      setError(
-        verifyData?.error ||
-          "Payment verification failed."
-      );
+            const verifyResponse =
+              await fetch(
+                "/api/bids/verify-payment",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                  },
+                  body: JSON.stringify({
+                    paymentOrderId:
+                      orderData.paymentOrderId,
+                    razorpay_payment_id:
+                      response.razorpay_payment_id,
+                    razorpay_order_id:
+                      response.razorpay_order_id,
+                    razorpay_signature:
+                      response.razorpay_signature,
+                  }),
+                }
+              );
 
-      setSuccess("");
-      return;
-    }
+            const verifyData =
+              await verifyResponse.json();
 
-    const verifiedBidAmount =
-      Number(
-        verifyData?.bid?.amount ??
-          bidAmount
-      );
+            if (
+              !verifyResponse.ok ||
+              !verifyData?.success
+            ) {
+              setError(
+                verifyData?.error ||
+                  "Payment verification failed."
+              );
 
-    setSuccess(
-      `Bid of ₹${verifiedBidAmount.toLocaleString(
-        "en-IN"
-      )} is now live.`
-    );
+              setSuccess("");
+              return;
+            }
 
-    setAmount("");
-    onSuccess?.(verifiedBidAmount);
-  } catch (verificationError) {
-    console.error(
-      "Bid payment verification error:",
-      verificationError
-    );
+            const verifiedBidAmount =
+              Number(
+                verifyData?.bid?.amount ??
+                  bidAmount
+              );
 
-    setError(
-      "Payment was received, but bid verification failed. Please try again."
-    );
+            setSuccess(
+              `Bid of ₹${verifiedBidAmount.toLocaleString(
+                "en-IN"
+              )} is now live.`
+            );
 
-    setSuccess("");
-  } finally {
-    setIsSubmitting(false);
-  }
-},
+            setAmount("");
+            onSuccess?.(verifiedBidAmount);
+          } catch (verificationError) {
+            console.error(
+              "Bid payment verification error:",
+              verificationError
+            );
+
+            setError(
+              "Payment was received, but bid verification failed. Please try again."
+            );
+
+            setSuccess("");
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
 
         modal: {
           ondismiss: () => {
@@ -354,7 +396,6 @@ export default function BidForm({
         );
 
       razorpay.open();
-
     } catch (submitError) {
       console.error(
         "Bid payment error:",
