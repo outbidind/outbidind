@@ -9,6 +9,31 @@ type BidFormProps = {
   onSuccess?: (newBid: number) => void;
 };
 
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  handler: (response: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+  }) => void;
+  modal?: {
+    ondismiss?: () => void;
+  };
+};
+
+type RazorpayInstance = {
+  open: () => void;
+};
+
+type RazorpayConstructor = new (
+  options: RazorpayOptions
+) => RazorpayInstance;
+
 export default function BidForm({
   listingId,
   currentBid,
@@ -22,6 +47,36 @@ export default function BidForm({
   const minimumBid =
     Math.floor(Number(currentBid)) + 1;
 
+  const loadRazorpay = async () => {
+    const existingRazorpay = (
+      window as Window & {
+        Razorpay?: RazorpayConstructor;
+      }
+    ).Razorpay;
+
+    if (existingRazorpay) {
+      return true;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const script =
+        document.createElement("script");
+
+      script.src =
+        "https://checkout.razorpay.com/v1/checkout.js";
+
+      script.onload = () => {
+        resolve(true);
+      };
+
+      script.onerror = () => {
+        resolve(false);
+      };
+
+      document.body.appendChild(script);
+    });
+  };
+
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
@@ -31,12 +86,6 @@ export default function BidForm({
     setSuccess("");
 
     const bidAmount = Number(amount);
-
-    /*
-     * =====================================================
-     * 1. BASIC AMOUNT VALIDATION
-     * =====================================================
-     */
 
     if (
       !Number.isFinite(bidAmount) ||
@@ -48,15 +97,6 @@ export default function BidForm({
       return;
     }
 
-    /*
-     * =====================================================
-     * 2. CURRENT BID CHECK
-     * =====================================================
-     *
-     * User must bid strictly higher than the
-     * currently displayed bid.
-     */
-
     if (bidAmount <= Number(currentBid)) {
       setError(
         `Your bid must be higher than ₹${Number(
@@ -66,15 +106,13 @@ export default function BidForm({
       return;
     }
 
-    /*
-     * =====================================================
-     * 3. AUTHENTICATION
-     * =====================================================
-     */
-
     setIsSubmitting(true);
 
     try {
+      // ===================================================
+      // 1. VERIFY LOGGED-IN USER
+      // ===================================================
+
       const supabase = createClient();
 
       const {
@@ -89,16 +127,9 @@ export default function BidForm({
         return;
       }
 
-      /*
-       * ===================================================
-       * 4. REFRESH THE CURRENT BID FROM DATABASE
-       * ===================================================
-       *
-       * The value displayed in the browser may be old.
-       *
-       * Therefore we fetch the latest business record
-       * before continuing.
-       */
+      // ===================================================
+      // 2. GET LATEST LISTING DATA
+      // ===================================================
 
       const {
         data: listing,
@@ -132,14 +163,6 @@ export default function BidForm({
         return;
       }
 
-      /*
-       * ===================================================
-       * 5. LISTING STATUS CHECK
-       * ===================================================
-       *
-       * Only LIVE businesses can receive normal bids.
-       */
-
       if (listing.listing_status !== "live") {
         setError(
           "Bidding is currently unavailable for this business."
@@ -147,12 +170,6 @@ export default function BidForm({
 
         return;
       }
-
-      /*
-       * ===================================================
-       * 6. SERVER-FRESH CURRENT BID CHECK
-       * ===================================================
-       */
 
       const latestCurrentBid =
         Number(listing.current_bid);
@@ -177,49 +194,177 @@ export default function BidForm({
         return;
       }
 
-      /*
-       * ===================================================
-       * 7. PAYMENT IS NOT EXECUTED HERE
-       * ===================================================
-       *
-       * IMPORTANT:
-       *
-       * We deliberately DO NOT call:
-       *
-       * supabase.rpc("place_bid")
-       *
-       * here.
-       *
-       * A bid must NOT become LIVE before payment
-       * verification.
-       *
-       * The next payment/security implementation will
-       * continue from this point.
-       */
+      // ===================================================
+      // 3. LOAD RAZORPAY CHECKOUT
+      // ===================================================
 
-      setSuccess(
-        `Bid of ₹${bidAmount.toLocaleString(
-          "en-IN"
-        )} passed the initial bid checks and is ready for security verification.`
+      const razorpayLoaded =
+        await loadRazorpay();
+
+      const Razorpay = (
+        window as Window & {
+          Razorpay?: RazorpayConstructor;
+        }
+      ).Razorpay;
+
+      if (
+        !razorpayLoaded ||
+        !Razorpay
+      ) {
+        setError(
+          "Unable to load the payment system. Please try again."
+        );
+
+        return;
+      }
+
+      // ===================================================
+      // 4. CREATE BID PAYMENT ORDER
+      // ===================================================
+
+      const orderResponse =
+        await fetch(
+          "/api/bids/create-order",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              listingId,
+              amount: bidAmount,
+            }),
+          }
+        );
+
+      const orderData =
+        await orderResponse.json();
+
+      if (
+        !orderResponse.ok ||
+        !orderData?.success
+      ) {
+        setError(
+          orderData?.error ||
+            "Unable to create bid payment order."
+        );
+
+        return;
+      }
+
+      // ===================================================
+      // 5. OPEN RAZORPAY CHECKOUT
+      // ===================================================
+
+      const razorpayOptions: RazorpayOptions = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "OutbidInd",
+        description:
+          `Bid for ${orderData.businessName}`,
+        order_id: orderData.orderId,
+
+        handler: async (response) => {
+  try {
+    setSuccess(
+      "Payment received. Verifying your bid..."
+    );
+
+    const verifyResponse =
+      await fetch(
+        "/api/bids/verify-payment",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            paymentOrderId:
+              orderData.paymentOrderId,
+            razorpay_payment_id:
+              response.razorpay_payment_id,
+            razorpay_order_id:
+              response.razorpay_order_id,
+            razorpay_signature:
+              response.razorpay_signature,
+          }),
+        }
       );
 
-      /*
-       * Keep the amount in the form for now.
-       *
-       * onSuccess is intentionally NOT called here
-       * because the bid has not become LIVE yet.
-       */
+    const verifyData =
+      await verifyResponse.json();
+
+    if (
+      !verifyResponse.ok ||
+      !verifyData?.success
+    ) {
+      setError(
+        verifyData?.error ||
+          "Payment verification failed."
+      );
+
+      setSuccess("");
+      return;
+    }
+
+    const verifiedBidAmount =
+      Number(
+        verifyData?.bid?.amount ??
+          bidAmount
+      );
+
+    setSuccess(
+      `Bid of ₹${verifiedBidAmount.toLocaleString(
+        "en-IN"
+      )} is now live.`
+    );
+
+    setAmount("");
+    onSuccess?.(verifiedBidAmount);
+  } catch (verificationError) {
+    console.error(
+      "Bid payment verification error:",
+      verificationError
+    );
+
+    setError(
+      "Payment was received, but bid verification failed. Please try again."
+    );
+
+    setSuccess("");
+  } finally {
+    setIsSubmitting(false);
+  }
+},
+
+        modal: {
+          ondismiss: () => {
+            setIsSubmitting(false);
+            setSuccess("");
+          },
+        },
+      };
+
+      const razorpay =
+        new Razorpay(
+          razorpayOptions
+        );
+
+      razorpay.open();
 
     } catch (submitError) {
       console.error(
-        "Bid submission error:",
+        "Bid payment error:",
         submitError
       );
 
       setError(
         "Unable to process your bid. Please try again."
       );
-    } finally {
+
       setIsSubmitting(false);
     }
   };
@@ -229,10 +374,6 @@ export default function BidForm({
       onSubmit={handleSubmit}
       className="space-y-5"
     >
-      {/* ================================================= */}
-      {/* CURRENT BID */}
-      {/* ================================================= */}
-
       <div>
         <p className="text-sm text-slate-500">
           Current bid
@@ -245,10 +386,6 @@ export default function BidForm({
           )}
         </p>
       </div>
-
-      {/* ================================================= */}
-      {/* BID AMOUNT */}
-      {/* ================================================= */}
 
       <div>
         <label
@@ -288,10 +425,6 @@ export default function BidForm({
         </p>
       </div>
 
-      {/* ================================================= */}
-      {/* ERROR */}
-      {/* ================================================= */}
-
       {error && (
         <p
           role="alert"
@@ -300,10 +433,6 @@ export default function BidForm({
           {error}
         </p>
       )}
-
-      {/* ================================================= */}
-      {/* SUCCESS / NEXT STEP MESSAGE */}
-      {/* ================================================= */}
 
       {success && (
         <p
@@ -314,17 +443,13 @@ export default function BidForm({
         </p>
       )}
 
-      {/* ================================================= */}
-      {/* BUTTON */}
-      {/* ================================================= */}
-
       <button
         type="submit"
         disabled={isSubmitting}
         className="w-full rounded-lg bg-[#e4572e] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 disabled:cursor-wait disabled:opacity-70"
       >
         {isSubmitting
-          ? "Checking..."
+          ? "Opening Payment..."
           : "Continue"}
       </button>
     </form>

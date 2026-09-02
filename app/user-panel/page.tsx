@@ -48,7 +48,7 @@ export default async function UserPanelPage({
 
   /* =====================================================
      MY BUSINESSES
-     
+
      IMPORTANT:
      We no longer query business_listings directly.
      The RPC uses auth.uid() internally.
@@ -113,21 +113,9 @@ export default async function UserPanelPage({
       "pending_review"
   ).length;
 
-  const approvedCount = businesses.filter(
-    (business) =>
-      business.listing_status ===
-      "approved"
-  ).length;
-
   const liveCount = businesses.filter(
     (business) =>
       business.listing_status === "live"
-  ).length;
-
-  const rejectedCount = businesses.filter(
-    (business) =>
-      business.listing_status ===
-      "rejected"
   ).length;
 
   /* =====================================================
@@ -265,7 +253,7 @@ export default async function UserPanelPage({
             STATUS CARDS
             ================================================= */}
 
-        <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-10 grid gap-4 sm:grid-cols-2">
 
           <a
             href="/user-panel?status=pending_review#listings"
@@ -281,19 +269,6 @@ export default async function UserPanelPage({
           </a>
 
           <a
-            href="/user-panel?status=approved#listings"
-            className="block rounded-2xl border border-emerald-200 bg-emerald-50 p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
-          >
-            <p className="text-sm font-semibold text-emerald-700">
-              Approved
-            </p>
-
-            <p className="mt-2 text-3xl font-black text-emerald-900">
-              {approvedCount}
-            </p>
-          </a>
-
-          <a
             href="/user-panel?status=live#listings"
             className="block rounded-2xl border border-blue-200 bg-blue-50 p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
           >
@@ -303,19 +278,6 @@ export default async function UserPanelPage({
 
             <p className="mt-2 text-3xl font-black text-blue-900">
               {liveCount}
-            </p>
-          </a>
-
-          <a
-            href="/user-panel?status=rejected#listings"
-            className="block rounded-2xl border border-red-200 bg-red-50 p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
-          >
-            <p className="text-sm font-semibold text-red-700">
-              Rejected
-            </p>
-
-            <p className="mt-2 text-3xl font-black text-red-900">
-              {rejectedCount}
             </p>
           </a>
 
