@@ -220,13 +220,10 @@ export default function Home() {
 
   /* ================= TOP BUSINESSES ================= */
 
+  // Every paid/live listing should appear in the marketplace,
+  // even when nobody has placed a bid above the starting bid yet.
   const topBusinesses = [...approvedBusinesses]
-    .filter(
-      (business) =>
-        business.listing_status === "live" &&
-        Number(business.current_bid ?? 0) >
-          Number(business.starting_bid ?? 0)
-    )
+    .filter((business) => business.listing_status === "live")
     .sort(
       (a, b) =>
         Number(b.current_bid ?? 0) -
@@ -238,13 +235,10 @@ export default function Home() {
 
   /* ================= LIVE BIDS ================= */
 
+  // A live auction is visible even if its current bid
+  // is still equal to the starting bid.
   const liveBids = [...approvedBusinesses]
-    .filter(
-      (business) =>
-        business.listing_status === "live" &&
-        Number(business.current_bid ?? 0) >
-          Number(business.starting_bid ?? 0)
-    )
+    .filter((business) => business.listing_status === "live")
     .sort(
       (a, b) =>
         Number(b.current_bid ?? 0) -
