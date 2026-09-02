@@ -1,6 +1,5 @@
 ﻿"use client";
 
-
 import { useEffect, useState } from "react";
 import BidForm from "@/components/BidForm";
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +17,89 @@ export default function BidSection({
 }: BidSectionProps) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [liveCurrentBid, setLiveCurrentBid] = useState(currentBid);
+
+  /*
+   * =====================================================
+   * KEEP CURRENT BID IN SYNC WITH SERVER PROPS
+   * =====================================================
+   */
+
+  useEffect(() => {
+    setLiveCurrentBid(currentBid);
+  }, [currentBid]);
+
+  /*
+   * =====================================================
+   * REAL-TIME CURRENT BID
+   * =====================================================
+   */
+
+  useEffect(() => {
+    if (listingStatus !== "live") {
+      return;
+    }
+
+    const supabase = createClient();
+
+    console.log(
+      "Realtime: creating channel for listing:",
+      listingId
+    );
+
+    const channel = supabase
+      .channel(`business-listing-${listingId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "business_listings",
+          filter: `id=eq.${listingId}`,
+        },
+        (payload) => {
+          console.log(
+            "Realtime update received:",
+            payload
+          );
+
+          const newCurrentBid = Number(
+            (payload.new as { current_bid?: number | string })
+              ?.current_bid ?? 0
+          );
+
+          console.log(
+            "Realtime new current bid:",
+            newCurrentBid
+          );
+
+          if (newCurrentBid > 0) {
+            setLiveCurrentBid(newCurrentBid);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(
+          "Realtime subscription status:",
+          status
+        );
+      });
+
+    return () => {
+      console.log(
+        "Realtime: removing channel for listing:",
+        listingId
+      );
+
+      supabase.removeChannel(channel);
+    };
+  }, [listingId, listingStatus]);
+
+  /*
+   * =====================================================
+   * AUTHENTICATION
+   * =====================================================
+   */
 
   useEffect(() => {
     const supabase = createClient();
@@ -35,14 +117,22 @@ export default function BidSection({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
+
+  /*
+   * =====================================================
+   * AUCTION STATUS
+   * =====================================================
+   */
 
   if (listingStatus !== "live") {
     return (
@@ -59,6 +149,12 @@ export default function BidSection({
     );
   }
 
+  /*
+   * =====================================================
+   * LOADING
+   * =====================================================
+   */
+
   if (loading) {
     return (
       <div className="mt-7 rounded-xl border border-white/10 bg-white/5 p-5">
@@ -68,6 +164,12 @@ export default function BidSection({
       </div>
     );
   }
+
+  /*
+   * =====================================================
+   * LOGIN REQUIRED
+   * =====================================================
+   */
 
   if (!user) {
     return (
@@ -92,11 +194,16 @@ export default function BidSection({
     );
   }
 
+  /*
+   * =====================================================
+   * BID FORM
+   * =====================================================
+   */
+
   return (
     <BidForm
       listingId={listingId}
-      currentBid={currentBid}
+      currentBid={liveCurrentBid}
     />
   );
 }
-
