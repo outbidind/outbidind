@@ -27,7 +27,17 @@ type RazorpayOptions = {
           }[];
         };
       };
+
+      hide: {
+        method:
+          | "emi"
+          | "netbanking"
+          | "wallet"
+          | "paylater";
+      }[];
+
       sequence: string[];
+
       preferences: {
         show_default_blocks: boolean;
       };
@@ -298,10 +308,28 @@ export default function BidForm({
               },
             },
 
+            // Explicitly hide unwanted methods
+            hide: [
+              {
+                method: "emi",
+              },
+              {
+                method: "netbanking",
+              },
+              {
+                method: "wallet",
+              },
+              {
+                method: "paylater",
+              },
+            ],
+
+            // Only our custom block
             sequence: [
               "block.payment_methods",
             ],
 
+            // Do not show Razorpay's default methods
             preferences: {
               show_default_blocks: false,
             },
