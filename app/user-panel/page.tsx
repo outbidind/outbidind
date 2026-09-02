@@ -1,6 +1,7 @@
 ﻿import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import BidForm from "@/components/BidForm";
+import PanelMobileMenu from "@/components/PanelMobileMenu";
 
 type Business = {
   id: string;
@@ -48,18 +49,16 @@ export default async function UserPanelPage({
 
   /* =====================================================
      MY BUSINESSES
-
+     
      IMPORTANT:
-     We no longer query business_listings directly.
+     We use the secure RPC.
      The RPC uses auth.uid() internally.
      ===================================================== */
 
   const {
     data: businessesData,
     error: businessesError,
-  } = await supabase.rpc(
-    "get_my_business_listings"
-  );
+  } = await supabase.rpc("get_my_business_listings");
 
   const businesses: Business[] =
     (businessesData ?? []) as Business[];
@@ -68,16 +67,14 @@ export default async function UserPanelPage({
      MY BIDS
 
      IMPORTANT:
-     We no longer query bids directly.
+     We use the secure RPC.
      The RPC uses auth.uid() internally.
      ===================================================== */
 
   const {
     data: bidsData,
     error: bidsError,
-  } = await supabase.rpc(
-    "get_my_bids"
-  );
+  } = await supabase.rpc("get_my_bids");
 
   const myBids: MyBid[] =
     (bidsData ?? []) as MyBid[];
@@ -98,8 +95,7 @@ export default async function UserPanelPage({
     validStatusFilters.includes(statusFilter)
       ? businesses.filter(
           (business) =>
-            business.listing_status ===
-            statusFilter
+            business.listing_status === statusFilter
         )
       : businesses;
 
@@ -109,13 +105,22 @@ export default async function UserPanelPage({
 
   const pendingCount = businesses.filter(
     (business) =>
-      business.listing_status ===
-      "pending_review"
+      business.listing_status === "pending_review"
+  ).length;
+
+  const approvedCount = businesses.filter(
+    (business) =>
+      business.listing_status === "approved"
   ).length;
 
   const liveCount = businesses.filter(
     (business) =>
       business.listing_status === "live"
+  ).length;
+
+  const rejectedCount = businesses.filter(
+    (business) =>
+      business.listing_status === "rejected"
   ).length;
 
   /* =====================================================
@@ -168,8 +173,10 @@ export default async function UserPanelPage({
           HEADER
           ================================================= */}
 
-      <header className="border-b border-slate-200 bg-white">
+      <header className="relative z-50 border-b border-slate-200 bg-white">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
+
+          {/* LOGO */}
 
           <a
             href="/"
@@ -184,23 +191,29 @@ export default async function UserPanelPage({
             </span>
           </a>
 
-          <div className="flex items-center gap-3">
+          {/* DESKTOP NAVIGATION */}
+
+          <div className="hidden items-center gap-3 sm:flex">
 
             <a
               href="/live-bids"
-              className="hidden rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 sm:block"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
             >
               Live Bids
             </a>
 
             <a
               href="/"
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             >
               Marketplace
             </a>
 
           </div>
+
+          {/* MOBILE MENU */}
+
+          <PanelMobileMenu />
 
         </nav>
       </header>
@@ -226,8 +239,7 @@ export default async function UserPanelPage({
           </h1>
 
           <p className="mt-3 text-slate-600">
-            Manage your listed businesses and
-            track your bids.
+            Manage your listed businesses and track your bids.
           </p>
 
           <p className="mt-2 text-sm text-slate-500">
@@ -240,12 +252,10 @@ export default async function UserPanelPage({
             ERRORS
             ================================================= */}
 
-        {(businessesError ||
-          bidsError) && (
+        {(businessesError || bidsError) && (
           <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-            Some account data could not be
-            loaded. Please refresh and try
-            again.
+            Some account data could not be loaded.
+            Please refresh and try again.
           </div>
         )}
 
@@ -347,8 +357,7 @@ export default async function UserPanelPage({
 
           </div>
 
-          {filteredBusinesses.length ===
-          0 ? (
+          {filteredBusinesses.length === 0 ? (
 
             <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
 
@@ -471,6 +480,7 @@ export default async function UserPanelPage({
 
                               {business.listing_status ===
                                 "live" && (
+
                                 <div className="w-[260px] rounded-xl border border-slate-200 bg-slate-50 p-3">
 
                                   <BidForm
@@ -484,6 +494,7 @@ export default async function UserPanelPage({
                                   />
 
                                 </div>
+
                               )}
 
                             </div>
@@ -538,9 +549,8 @@ export default async function UserPanelPage({
               </h3>
 
               <p className="mt-2 text-sm text-slate-500">
-                Your bids will appear here
-                when you participate in a
-                live auction.
+                Your bids will appear here when you participate
+                in a live auction.
               </p>
 
               <a
@@ -601,7 +611,8 @@ export default async function UserPanelPage({
 
                         const myBid =
                           Number(
-                            bid.amount ?? 0
+                            bid.amount ??
+                              0
                           );
 
                         const isHighest =
@@ -609,6 +620,7 @@ export default async function UserPanelPage({
                           currentBid;
 
                         return (
+
                           <tr
                             key={bid.id}
                             className="hover:bg-slate-50"
@@ -663,6 +675,7 @@ export default async function UserPanelPage({
                             </td>
 
                           </tr>
+
                         );
                       }
                     )}

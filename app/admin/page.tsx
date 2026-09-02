@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import ApproveButton from "./ApproveButton";
 import RejectButton from "./RejectButton";
 import StartAuctionButton from "./StartAuctionButton";
+import PanelMobileMenu from "@/components/PanelMobileMenu";
 
 type Listing = {
   id: string;
@@ -38,39 +39,20 @@ export default async function AdminPage() {
   }
 
   /* =========================================================
-     FETCH BUSINESS LISTINGS + SERVER-SIDE ADMIN CHECK
+     ADMIN CHECK
   ========================================================= */
 
-  /*
-   * IMPORTANT:
-   * Do NOT query user_roles or business_listings directly here.
-   *
-   * Direct authenticated SELECT access to user_roles has been
-   * intentionally removed. The protected RPC performs the
-   * admin-role check server-side using auth.uid().
-   *
-   * If the current user is not an admin, the RPC returns an
-   * authorization error and no internal listing data is exposed.
-   */
-  const {
-    data: listings,
-    error: listingsError,
-  } = await supabase.rpc("admin_get_business_listings");
+  const { data: adminStatus, error: adminError } =
+    await supabase.rpc("is_current_user_admin");
 
-  /*
-   * The RPC itself is the authorization boundary.
-   * Never continue rendering the admin dashboard when it fails.
-   */
-  if (listingsError) {
-    console.error(
-      "Admin authorization/listing error:",
-      listingsError
-    );
-
+  if (adminError || adminStatus !== true) {
     return (
       <main className="min-h-screen bg-zinc-50 px-6 py-16">
         <div className="mx-auto max-w-2xl rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
-          <div className="mb-4 text-4xl">🔒</div>
+
+          <div className="mb-4 text-4xl">
+            🔒
+          </div>
 
           <h1 className="text-2xl font-semibold text-zinc-900">
             Access Denied
@@ -79,48 +61,88 @@ export default async function AdminPage() {
           <p className="mt-3 text-zinc-600">
             You do not have permission to access the admin dashboard.
           </p>
+
         </div>
       </main>
     );
   }
 
-  const allListings: Listing[] = (listings ?? []) as Listing[];
+  /* =========================================================
+     FETCH BUSINESS LISTINGS
+  ========================================================= */
+
+  /*
+   * IMPORTANT:
+   * Do NOT query business_listings directly here.
+   *
+   * The admin dashboard uses the protected
+   * admin_get_business_listings() RPC.
+   */
+
+  const {
+    data: listings,
+    error: listingsError,
+  } = await supabase.rpc(
+    "admin_get_business_listings"
+  );
+
+  const allListings: Listing[] =
+    (listings ?? []) as Listing[];
 
   /* =========================================================
      LISTING STATUS FILTERS
   ========================================================= */
 
   const pendingListings = allListings.filter(
-    (listing) => listing.listing_status === "pending_review",
+    (listing) =>
+      listing.listing_status ===
+      "pending_review"
   );
 
   const approvedListings = allListings.filter(
-    (listing) => listing.listing_status === "approved",
+    (listing) =>
+      listing.listing_status ===
+      "approved"
   );
 
   const liveListings = allListings.filter(
-    (listing) => listing.listing_status === "live",
+    (listing) =>
+      listing.listing_status ===
+      "live"
   );
 
   const rejectedListings = allListings.filter(
-    (listing) => listing.listing_status === "rejected",
+    (listing) =>
+      listing.listing_status ===
+      "rejected"
   );
 
   /* =========================================================
      HELPERS
   ========================================================= */
 
-  const formatMoney = (value: number | null) => {
-    return `₹${Number(value ?? 0).toLocaleString("en-IN")}`;
+  const formatMoney = (
+    value: number | null
+  ) => {
+    return `₹${Number(
+      value ?? 0
+    ).toLocaleString("en-IN")}`;
   };
 
-  const formatDate = (value: string | null) => {
+  const formatDate = (
+    value: string | null
+  ) => {
     if (!value) return "—";
 
-    return new Date(value).toLocaleString("en-IN");
+    return new Date(
+      value
+    ).toLocaleString("en-IN");
   };
 
-  const statusBadge = (status: string) => {
+  const statusBadge = (
+    status: string
+  ) => {
+
     if (status === "approved") {
       return (
         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
@@ -152,15 +174,23 @@ export default async function AdminPage() {
     );
   };
 
+  /* =========================================================
+     PAGE
+  ========================================================= */
+
   return (
     <main className="min-h-screen bg-zinc-50">
+
       {/* =====================================================
           HEADER
       ===================================================== */}
 
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+      <header className="relative z-50 border-b border-zinc-200 bg-white">
+
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-6">
+
           <div>
+
             <p className="text-sm font-medium text-zinc-500">
               OutbidInd
             </p>
@@ -168,9 +198,13 @@ export default async function AdminPage() {
             <h1 className="text-2xl font-bold text-zinc-900">
               Admin Dashboard
             </h1>
+
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* DESKTOP HEADER */}
+
+          <div className="hidden items-center gap-3 sm:flex">
+
             <a
               href="/"
               className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
@@ -181,20 +215,29 @@ export default async function AdminPage() {
             <div className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
               Administrator
             </div>
+
           </div>
+
+          {/* MOBILE MENU */}
+
+          <PanelMobileMenu admin />
+
         </div>
+
       </header>
 
       {/* =====================================================
           MAIN
       ===================================================== */}
 
-      <section className="mx-auto max-w-7xl px-6 py-10">
+      <section className="mx-auto max-w-7xl px-5 py-10 sm:px-6">
+
         {/* ===================================================
             PAGE TITLE
         =================================================== */}
 
         <div className="mb-8">
+
           <p className="text-sm font-semibold uppercase tracking-wider text-[#d94d28]">
             Control Center
           </p>
@@ -207,6 +250,7 @@ export default async function AdminPage() {
             Review, approve and manage businesses submitted to the
             OutbidInd marketplace.
           </p>
+
         </div>
 
         {/* ===================================================
@@ -214,9 +258,11 @@ export default async function AdminPage() {
         =================================================== */}
 
         <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
           {/* Pending */}
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+
             <p className="text-sm font-medium text-amber-700">
               Pending Review
             </p>
@@ -224,11 +270,13 @@ export default async function AdminPage() {
             <p className="mt-2 text-3xl font-black text-amber-900">
               {pendingListings.length}
             </p>
+
           </div>
 
           {/* Approved */}
 
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+
             <p className="text-sm font-medium text-emerald-700">
               Approved
             </p>
@@ -236,11 +284,13 @@ export default async function AdminPage() {
             <p className="mt-2 text-3xl font-black text-emerald-900">
               {approvedListings.length}
             </p>
+
           </div>
 
           {/* Live */}
 
           <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+
             <p className="text-sm font-medium text-blue-700">
               Live Auctions
             </p>
@@ -248,11 +298,13 @@ export default async function AdminPage() {
             <p className="mt-2 text-3xl font-black text-blue-900">
               {liveListings.length}
             </p>
+
           </div>
 
           {/* Rejected */}
 
           <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+
             <p className="text-sm font-medium text-red-700">
               Rejected
             </p>
@@ -260,19 +312,29 @@ export default async function AdminPage() {
             <p className="mt-2 text-3xl font-black text-red-900">
               {rejectedListings.length}
             </p>
+
           </div>
+
         </div>
 
         {/* ===================================================
             ERRORS
         =================================================== */}
 
+        {listingsError && (
+          <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
+            Unable to load business listings.
+          </div>
+        )}
+
         {/* ===================================================
             PENDING LISTINGS
         =================================================== */}
 
         <section className="mb-12">
+
           <div className="mb-5">
+
             <p className="text-sm font-semibold uppercase tracking-wider text-amber-600">
               Review Queue
             </p>
@@ -284,11 +346,16 @@ export default async function AdminPage() {
             <p className="mt-1 text-sm text-zinc-500">
               These businesses are waiting for administrator approval.
             </p>
+
           </div>
 
           {pendingListings.length === 0 ? (
+
             <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
-              <div className="mb-3 text-4xl">✓</div>
+
+              <div className="mb-3 text-4xl">
+                ✓
+              </div>
 
               <h3 className="text-lg font-bold text-zinc-900">
                 No Pending Listings
@@ -297,119 +364,178 @@ export default async function AdminPage() {
               <p className="mt-2 text-sm text-zinc-500">
                 There are currently no businesses waiting for review.
               </p>
+
             </div>
+
           ) : (
+
             <div className="grid gap-6 lg:grid-cols-2">
-              {pendingListings.map((listing) => (
-                <article
-                  key={listing.id}
-                  className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-zinc-900">
-                        {listing.business_name}
-                      </h3>
 
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {listing.category ?? "Uncategorized"} ·{" "}
-                        {listing.location ?? "Location not provided"}
-                      </p>
-                    </div>
+              {pendingListings.map(
+                (listing) => (
 
-                    {statusBadge(listing.listing_status)}
-                  </div>
+                  <article
+                    key={listing.id}
+                    className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+                  >
 
-                  {listing.description && (
-                    <p className="mt-5 text-sm leading-6 text-zinc-600">
-                      {listing.description}
-                    </p>
-                  )}
+                    <div className="flex items-start justify-between gap-4">
 
-                  <div className="mt-6 grid grid-cols-2 gap-4">
-                    <div className="rounded-xl bg-zinc-50 p-4">
-                      <p className="text-xs text-zinc-500">
-                        Starting Bid
-                      </p>
-
-                      <p className="mt-1 font-semibold text-zinc-900">
-                        {formatMoney(listing.starting_bid)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-zinc-50 p-4">
-                      <p className="text-xs text-zinc-500">
-                        Current Bid
-                      </p>
-
-                      <p className="mt-1 font-semibold text-zinc-900">
-                        {formatMoney(listing.current_bid)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 space-y-3 text-sm">
-                    <p>
-                      <span className="font-semibold text-zinc-900">
-                        AI Review:
-                      </span>{" "}
-                      <span className="text-zinc-600">
-                        {listing.ai_review_status ?? "Not reviewed"}
-                      </span>
-                    </p>
-
-                    {listing.business_website && (
-                      <p>
-                        <span className="font-semibold text-zinc-900">
-                          Website:
-                        </span>{" "}
-                        <a
-                          href={
-                            listing.business_website.startsWith("http")
-                              ? listing.business_website
-                              : `https://${listing.business_website}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-blue-600 hover:underline"
-                        >
-                          Visit Website ↗
-                        </a>
-                      </p>
-                    )}
-
-                    {listing.additional_information && (
                       <div>
-                        <p className="font-semibold text-zinc-900">
-                          Additional Information
+
+                        <h3 className="text-xl font-bold text-zinc-900">
+                          {listing.business_name}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-zinc-500">
+                          {listing.category ??
+                            "Uncategorized"}{" "}
+                          ·{" "}
+                          {listing.location ??
+                            "Location not provided"}
                         </p>
 
-                        <p className="mt-1 whitespace-pre-line text-zinc-600">
-                          {listing.additional_information}
-                        </p>
                       </div>
+
+                      {statusBadge(
+                        listing.listing_status
+                      )}
+
+                    </div>
+
+                    {listing.description && (
+                      <p className="mt-5 text-sm leading-6 text-zinc-600">
+                        {listing.description}
+                      </p>
                     )}
-                  </div>
 
-                  <div className="mt-6 rounded-xl border border-zinc-200 p-4">
-                    <p className="text-xs text-zinc-500">
-                      Submitted
-                    </p>
+                    <div className="mt-6 grid grid-cols-2 gap-4">
 
-                    <p className="mt-1 text-sm text-zinc-700">
-                      {formatDate(listing.created_at)}
-                    </p>
-                  </div>
+                      <div className="rounded-xl bg-zinc-50 p-4">
 
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <ApproveButton listingId={listing.id} />
+                        <p className="text-xs text-zinc-500">
+                          Starting Bid
+                        </p>
 
-                    <RejectButton listingId={listing.id} />
-                  </div>
-                </article>
-              ))}
+                        <p className="mt-1 font-semibold text-zinc-900">
+                          {formatMoney(
+                            listing.starting_bid
+                          )}
+                        </p>
+
+                      </div>
+
+                      <div className="rounded-xl bg-zinc-50 p-4">
+
+                        <p className="text-xs text-zinc-500">
+                          Current Bid
+                        </p>
+
+                        <p className="mt-1 font-semibold text-zinc-900">
+                          {formatMoney(
+                            listing.current_bid
+                          )}
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                    <div className="mt-5 space-y-3 text-sm">
+
+                      <p>
+
+                        <span className="font-semibold text-zinc-900">
+                          AI Review:
+                        </span>{" "}
+
+                        <span className="text-zinc-600">
+                          {listing.ai_review_status ??
+                            "Not reviewed"}
+                        </span>
+
+                      </p>
+
+                      {listing.business_website && (
+
+                        <p>
+
+                          <span className="font-semibold text-zinc-900">
+                            Website:
+                          </span>{" "}
+
+                          <a
+                            href={
+                              listing.business_website.startsWith(
+                                "http"
+                              )
+                                ? listing.business_website
+                                : `https://${listing.business_website}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-blue-600 hover:underline"
+                          >
+                            Visit Website ↗
+                          </a>
+
+                        </p>
+
+                      )}
+
+                      {listing.additional_information && (
+
+                        <div>
+
+                          <p className="font-semibold text-zinc-900">
+                            Additional Information
+                          </p>
+
+                          <p className="mt-1 whitespace-pre-line text-zinc-600">
+                            {listing.additional_information}
+                          </p>
+
+                        </div>
+
+                      )}
+
+                    </div>
+
+                    <div className="mt-6 rounded-xl border border-zinc-200 p-4">
+
+                      <p className="text-xs text-zinc-500">
+                        Submitted
+                      </p>
+
+                      <p className="mt-1 text-sm text-zinc-700">
+                        {formatDate(
+                          listing.created_at
+                        )}
+                      </p>
+
+                    </div>
+
+                    <div className="mt-6 flex flex-wrap gap-3">
+
+                      <ApproveButton
+                        listingId={listing.id}
+                      />
+
+                      <RejectButton
+                        listingId={listing.id}
+                      />
+
+                    </div>
+
+                  </article>
+
+                )
+              )}
+
             </div>
+
           )}
+
         </section>
 
         {/* ===================================================
@@ -417,7 +543,9 @@ export default async function AdminPage() {
         =================================================== */}
 
         <section className="mb-12">
+
           <div className="mb-5">
+
             <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
               Active Auctions
             </p>
@@ -430,10 +558,13 @@ export default async function AdminPage() {
               Approved businesses whose auctions have been started
               by an admin.
             </p>
+
           </div>
 
           {liveListings.length === 0 ? (
+
             <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
+
               <h3 className="font-bold text-zinc-900">
                 No Live Auctions
               </h3>
@@ -441,13 +572,21 @@ export default async function AdminPage() {
               <p className="mt-2 text-sm text-zinc-500">
                 Start an approved business auction to make it live.
               </p>
+
             </div>
+
           ) : (
+
             <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+
               <div className="overflow-x-auto">
+
                 <table className="w-full min-w-[950px] text-left">
+
                   <thead className="border-b border-zinc-200 bg-zinc-50">
+
                     <tr>
+
                       <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
                         Business
                       </th>
@@ -471,72 +610,111 @@ export default async function AdminPage() {
                       <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
                         Action
                       </th>
+
                     </tr>
+
                   </thead>
 
                   <tbody className="divide-y divide-zinc-100">
-                    {liveListings.map((listing) => {
-                      const hasBid =
-                        Number(listing.current_bid ?? 0) >
-                        Number(listing.starting_bid ?? 0);
 
-                      return (
-                        <tr
-                          key={listing.id}
-                          className="transition hover:bg-zinc-50"
-                        >
-                          <td className="px-5 py-5">
-                            <p className="font-bold text-zinc-900">
-                              {listing.business_name}
-                            </p>
+                    {liveListings.map(
+                      (listing) => {
 
-                            <p className="mt-1 text-xs text-zinc-500">
-                              {listing.location ?? "Location not provided"}
-                            </p>
-                          </td>
+                        const hasBid =
+                          Number(
+                            listing.current_bid ??
+                              0
+                          ) >
+                          Number(
+                            listing.starting_bid ??
+                              0
+                          );
 
-                          <td className="px-5 py-5 text-sm text-zinc-600">
-                            {listing.category ?? "—"}
-                          </td>
+                        return (
 
-                          <td className="px-5 py-5 text-sm font-semibold text-zinc-700">
-                            {formatMoney(listing.starting_bid)}
-                          </td>
+                          <tr
+                            key={listing.id}
+                            className="transition hover:bg-zinc-50"
+                          >
 
-                          <td className="px-5 py-5 text-sm font-black text-zinc-900">
-                            {formatMoney(listing.current_bid)}
-                          </td>
+                            <td className="px-5 py-5">
 
-                          <td className="px-5 py-5">
-                            {hasBid ? (
-                              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                                Bid Placed
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">
-                                No Bids Yet
-                              </span>
-                            )}
-                          </td>
+                              <p className="font-bold text-zinc-900">
+                                {listing.business_name}
+                              </p>
 
-                          <td className="px-5 py-5">
-                            <a
-                              href={`/business/${listing.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-[#e4572e]"
-                            >
-                              View Auction ↗
-                            </a>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              <p className="mt-1 text-xs text-zinc-500">
+                                {listing.location ??
+                                  "Location not provided"}
+                              </p>
+
+                            </td>
+
+                            <td className="px-5 py-5 text-sm text-zinc-600">
+                              {listing.category ??
+                                "—"}
+                            </td>
+
+                            <td className="px-5 py-5 text-sm font-semibold text-zinc-700">
+                              {formatMoney(
+                                listing.starting_bid
+                              )}
+                            </td>
+
+                            <td className="px-5 py-5 text-sm font-black text-zinc-900">
+                              {formatMoney(
+                                listing.current_bid
+                              )}
+                            </td>
+
+                            <td className="px-5 py-5">
+
+                              {hasBid ? (
+
+                                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                                  Bid Placed
+                                </span>
+
+                              ) : (
+
+                                <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">
+                                  No Bids Yet
+                                </span>
+
+                              )}
+
+                            </td>
+
+                            <td className="px-5 py-5">
+
+                              <a
+                                href={`/business/${listing.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-[#e4572e]"
+                              >
+                                View Auction ↗
+                              </a>
+
+                            </td>
+
+                          </tr>
+
+                        );
+
+                      }
+                    )}
+
                   </tbody>
+
                 </table>
+
               </div>
+
             </div>
+
           )}
+
         </section>
 
         {/* ===================================================
@@ -544,7 +722,9 @@ export default async function AdminPage() {
         =================================================== */}
 
         <section className="mb-12">
+
           <div className="mb-5">
+
             <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600">
               Approved Queue
             </p>
@@ -557,10 +737,13 @@ export default async function AdminPage() {
               Approved businesses waiting to be started as live
               auctions.
             </p>
+
           </div>
 
           {approvedListings.length === 0 ? (
+
             <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
+
               <h3 className="font-bold text-zinc-900">
                 No Approved Businesses
               </h3>
@@ -568,13 +751,21 @@ export default async function AdminPage() {
               <p className="mt-2 text-sm text-zinc-500">
                 No businesses have been approved yet.
               </p>
+
             </div>
+
           ) : (
+
             <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+
               <div className="overflow-x-auto">
+
                 <table className="w-full min-w-[850px] text-left">
+
                   <thead className="border-b border-zinc-200 bg-zinc-50">
+
                     <tr>
+
                       <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
                         Business
                       </th>
@@ -602,68 +793,101 @@ export default async function AdminPage() {
                       <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
                         Action
                       </th>
+
                     </tr>
+
                   </thead>
 
                   <tbody className="divide-y divide-zinc-100">
-                    {approvedListings.map((listing) => (
-                      <tr
-                        key={listing.id}
-                        className="transition hover:bg-zinc-50"
-                      >
-                        <td className="px-5 py-5">
-                          <p className="font-bold text-zinc-900">
-                            {listing.business_name}
-                          </p>
 
-                          <p className="mt-1 text-xs text-zinc-500">
-                            {listing.location ?? "Location not provided"}
-                          </p>
-                        </td>
+                    {approvedListings.map(
+                      (listing) => (
 
-                        <td className="px-5 py-5 text-sm text-zinc-600">
-                          {listing.category ?? "—"}
-                        </td>
+                        <tr
+                          key={listing.id}
+                          className="transition hover:bg-zinc-50"
+                        >
 
-                        <td className="px-5 py-5 text-sm font-semibold text-zinc-700">
-                          {formatMoney(listing.starting_bid)}
-                        </td>
+                          <td className="px-5 py-5">
 
-                        <td className="px-5 py-5 text-sm font-black text-zinc-900">
-                          {formatMoney(listing.current_bid)}
-                        </td>
+                            <p className="font-bold text-zinc-900">
+                              {listing.business_name}
+                            </p>
 
-                        <td className="px-5 py-5">
-                          {statusBadge(listing.listing_status)}
-                        </td>
+                            <p className="mt-1 text-xs text-zinc-500">
+                              {listing.location ??
+                                "Location not provided"}
+                            </p>
 
-                        <td className="px-5 py-5 text-sm text-zinc-600">
-                          {formatDate(listing.admin_reviewed_at)}
-                        </td>
+                          </td>
 
-                        <td className="px-5 py-5">
-                          <div className="flex flex-col gap-2">
-                            <StartAuctionButton
-                              listingId={listing.id}
-                            />
+                          <td className="px-5 py-5 text-sm text-zinc-600">
+                            {listing.category ??
+                              "—"}
+                          </td>
 
-                            <a
-                              href={`/business/${listing.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-bold text-zinc-800 transition hover:bg-zinc-50"
-                            >
-                              View Business ↗
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-5 py-5 text-sm font-semibold text-zinc-700">
+                            {formatMoney(
+                              listing.starting_bid
+                            )}
+                          </td>
+
+                          <td className="px-5 py-5 text-sm font-black text-zinc-900">
+                            {formatMoney(
+                              listing.current_bid
+                            )}
+                          </td>
+
+                          <td className="px-5 py-5">
+                            {statusBadge(
+                              listing.listing_status
+                            )}
+                          </td>
+
+                          <td className="px-5 py-5 text-sm text-zinc-600">
+                            {formatDate(
+                              listing.admin_reviewed_at
+                            )}
+                          </td>
+
+                          <td className="px-5 py-5">
+
+                            <div className="flex flex-col gap-2">
+
+                              <StartAuctionButton
+                                listingId={
+                                  listing.id
+                                }
+                              />
+
+                              <a
+                                href={`/business/${listing.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-bold text-zinc-800 transition hover:bg-zinc-50"
+                              >
+                                View Business ↗
+                              </a>
+
+                            </div>
+
+                          </td>
+
+                        </tr>
+
+                      )
+                    )}
+
                   </tbody>
+
                 </table>
+
               </div>
+
             </div>
+
           )}
+
         </section>
 
         {/* ===================================================
@@ -671,7 +895,9 @@ export default async function AdminPage() {
         =================================================== */}
 
         <section>
+
           <div className="mb-5">
+
             <p className="text-sm font-semibold uppercase tracking-wider text-red-600">
               Rejected
             </p>
@@ -683,10 +909,13 @@ export default async function AdminPage() {
             <p className="mt-1 text-sm text-zinc-500">
               Listings that were rejected during administrator review.
             </p>
+
           </div>
 
           {rejectedListings.length === 0 ? (
+
             <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
+
               <h3 className="font-bold text-zinc-900">
                 No Rejected Businesses
               </h3>
@@ -694,67 +923,103 @@ export default async function AdminPage() {
               <p className="mt-2 text-sm text-zinc-500">
                 No business listings have been rejected.
               </p>
+
             </div>
+
           ) : (
+
             <div className="grid gap-5 lg:grid-cols-2">
-              {rejectedListings.map((listing) => (
-                <article
-                  key={listing.id}
-                  className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-zinc-900">
-                        {listing.business_name}
-                      </h3>
 
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {listing.category ?? "Uncategorized"} ·{" "}
-                        {listing.location ?? "Location not provided"}
-                      </p>
+              {rejectedListings.map(
+                (listing) => (
+
+                  <article
+                    key={listing.id}
+                    className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm"
+                  >
+
+                    <div className="flex items-start justify-between gap-4">
+
+                      <div>
+
+                        <h3 className="text-xl font-bold text-zinc-900">
+                          {listing.business_name}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-zinc-500">
+                          {listing.category ??
+                            "Uncategorized"}{" "}
+                          ·{" "}
+                          {listing.location ??
+                            "Location not provided"}
+                        </p>
+
+                      </div>
+
+                      {statusBadge(
+                        listing.listing_status
+                      )}
+
                     </div>
 
-                    {statusBadge(listing.listing_status)}
-                  </div>
+                    <div className="mt-6 rounded-xl bg-red-50 p-4">
 
-                  <div className="mt-6 rounded-xl bg-red-50 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-red-600">
-                      Rejection Reason
-                    </p>
-
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-red-900">
-                      {listing.rejection_reason ||
-                        "No rejection reason provided."}
-                    </p>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-2 gap-4">
-                    <div className="rounded-xl bg-zinc-50 p-4">
-                      <p className="text-xs text-zinc-500">
-                        Submitted
+                      <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+                        Rejection Reason
                       </p>
 
-                      <p className="mt-1 text-sm font-semibold text-zinc-800">
-                        {formatDate(listing.created_at)}
+                      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-red-900">
+                        {listing.rejection_reason ||
+                          "No rejection reason provided."}
                       </p>
+
                     </div>
 
-                    <div className="rounded-xl bg-zinc-50 p-4">
-                      <p className="text-xs text-zinc-500">
-                        Reviewed
-                      </p>
+                    <div className="mt-5 grid grid-cols-2 gap-4">
 
-                      <p className="mt-1 text-sm font-semibold text-zinc-800">
-                        {formatDate(listing.admin_reviewed_at)}
-                      </p>
+                      <div className="rounded-xl bg-zinc-50 p-4">
+
+                        <p className="text-xs text-zinc-500">
+                          Submitted
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold text-zinc-800">
+                          {formatDate(
+                            listing.created_at
+                          )}
+                        </p>
+
+                      </div>
+
+                      <div className="rounded-xl bg-zinc-50 p-4">
+
+                        <p className="text-xs text-zinc-500">
+                          Reviewed
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold text-zinc-800">
+                          {formatDate(
+                            listing.admin_reviewed_at
+                          )}
+                        </p>
+
+                      </div>
+
                     </div>
-                  </div>
-                </article>
-              ))}
+
+                  </article>
+
+                )
+              )}
+
             </div>
+
           )}
+
         </section>
+
       </section>
+
     </main>
   );
 }

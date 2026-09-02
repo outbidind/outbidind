@@ -37,6 +37,8 @@ export default function Home() {
 
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const [authMessage, setAuthMessage] = useState("");
 
   const [approvedBusinesses, setApprovedBusinesses] =
@@ -298,115 +300,160 @@ export default function Home() {
 
       {/* ================= HEADER ================= */}
 
-      <header className="relative z-10 border-b border-slate-200/80 bg-[#f6f7f5]/95 backdrop-blur">
+      <header className="relative z-50 border-b border-slate-200/80 bg-[#f6f7f5]/95 backdrop-blur">
         <nav
-          className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8"
+          className="mx-auto max-w-7xl px-5 py-4 sm:px-8 sm:py-5"
           aria-label="Main navigation"
         >
-          <a
-            href="#top"
-            className="flex items-center gap-3"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">
-              O
-            </span>
-
-            <span className="text-lg font-bold tracking-tight text-slate-950">
-              OutbidInd
-            </span>
-          </a>
-
-          {/* Desktop Navigation */}
-
-          <div className="hidden items-center gap-8 text-sm font-semibold text-slate-600 md:flex">
+          <div className="flex items-center justify-between">
             <a
-              className="transition hover:text-[#d94d28]"
-              href="#explore"
+              href="#top"
+              className="flex items-center gap-3"
+              onClick={() => setMobileMenuOpen(false)}
             >
-              Explore
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">
+                O
+              </span>
+
+              <span className="text-lg font-bold tracking-tight text-slate-950">
+                OutbidInd
+              </span>
             </a>
 
-            <a
-              className="transition hover:text-[#d94d28]"
-              href="#live-bids"
-            >
-              Live Bids
-            </a>
+            {/* Desktop Navigation */}
 
-            <a
-              className="transition hover:text-[#d94d28]"
-              href="#how-it-works"
-            >
-              How It Works
-            </a>
+            <div className="hidden items-center gap-8 text-sm font-semibold text-slate-600 md:flex">
+              <a className="transition hover:text-[#d94d28]" href="#explore">
+                Explore
+              </a>
+
+              <a className="transition hover:text-[#d94d28]" href="#live-bids">
+                Live Bids
+              </a>
+
+              <a className="transition hover:text-[#d94d28]" href="#how-it-works">
+                How It Works
+              </a>
+
+              <button type="button" className="transition hover:text-[#d94d28]" onClick={openListing}>
+                List Your Business
+              </button>
+            </div>
+
+            {/* Desktop Account */}
+
+            <div className="hidden items-center gap-3 md:flex">
+              {userEmail ? (
+                <>
+                  {isAdmin ? (
+                    <a href="/admin" className="rounded-lg bg-[#e4572e] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#c94724]">
+                      Dashboard
+                    </a>
+                  ) : (
+                    <>
+                      <a href="/user-panel" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                        My Panel
+                      </a>
+
+                      <span className="max-w-36 truncate rounded-lg px-3 py-2 text-sm font-semibold text-slate-500">
+                        {userEmail}
+                      </span>
+                    </>
+                  )}
+
+                  <button type="button" className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800" onClick={handleLogout}>
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-orange-50" onClick={() => setActiveModal("login")}>
+                    Login
+                  </button>
+
+                  <button type="button" className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800" onClick={() => setActiveModal("signup")}>
+                    Sign up
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Mobile Menu Button */}
 
             <button
-              className="transition hover:text-[#d94d28]"
-              onClick={openListing}
+              type="button"
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-800 transition hover:bg-slate-50 md:hidden"
             >
-              List Your Business
+              <span className="sr-only">
+                {mobileMenuOpen ? "Close menu" : "Open menu"}
+              </span>
+              <span className="text-xl leading-none" aria-hidden="true">
+                {mobileMenuOpen ? "×" : "☰"}
+              </span>
             </button>
           </div>
 
-          {/* Account */}
+          {/* Mobile Navigation */}
 
-          <div className="hidden items-center gap-3 md:flex">
-            {userEmail ? (
-              <>
-                {isAdmin ? (
-                  <a
-                    href="/admin"
-                    className="rounded-lg bg-[#e4572e] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#c94724]"
-                  >
-                    Dashboard
-                  </a>
+          {mobileMenuOpen && (
+            <div className="mt-4 border-t border-slate-200 pt-4 md:hidden">
+              <div className="flex flex-col gap-1 text-sm font-semibold text-slate-700">
+                <a href="#explore" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]">
+                  Explore
+                </a>
+
+                <a href="#live-bids" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]">
+                  Live Bids
+                </a>
+
+                <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]">
+                  How It Works
+                </a>
+
+                <button type="button" className="rounded-lg px-4 py-3 text-left transition hover:bg-orange-50 hover:text-[#d94d28]" onClick={() => { setMobileMenuOpen(false); openListing(); }}>
+                  List Your Business
+                </button>
+
+                <div className="my-2 border-t border-slate-200" />
+
+                {userEmail ? (
+                  <>
+                    {isAdmin ? (
+                      <a href="/admin" onClick={() => setMobileMenuOpen(false)} className="rounded-lg bg-[#e4572e] px-4 py-3 text-center font-bold text-white transition hover:bg-[#c94724]">
+                        Dashboard
+                      </a>
+                    ) : (
+                      <>
+                        <a href="/user-panel" onClick={() => setMobileMenuOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-center font-bold text-slate-700 transition hover:bg-slate-50">
+                          My Panel
+                        </a>
+                        <div className="truncate px-4 py-3 text-center text-xs font-semibold text-slate-500">
+                          {userEmail}
+                        </div>
+                      </>
+                    )}
+
+                    <button type="button" className="rounded-lg bg-slate-950 px-4 py-3 font-bold text-white transition hover:bg-slate-800" onClick={async () => { setMobileMenuOpen(false); await handleLogout(); }}>
+                      Logout
+                    </button>
+                  </>
                 ) : (
                   <>
-                    <a
-                      href="/user-panel"
-                      className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                    >
-                      My Panel
-                    </a>
+                    <button type="button" className="rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-orange-50" onClick={() => { setMobileMenuOpen(false); setActiveModal("login"); }}>
+                      Login
+                    </button>
 
-                    <span className="max-w-36 truncate rounded-lg px-3 py-2 text-sm font-semibold text-slate-500">
-                      {userEmail}
-                    </span>
+                    <button type="button" className="rounded-lg bg-slate-950 px-4 py-3 font-bold text-white transition hover:bg-slate-800" onClick={() => { setMobileMenuOpen(false); setActiveModal("signup"); }}>
+                      Sign up
+                    </button>
                   </>
                 )}
-
-                <button
-                  type="button"
-                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
-                  onClick={handleLogout}
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-orange-50"
-                  onClick={() =>
-                    setActiveModal("login")
-                  }
-                >
-                  Login
-                </button>
-
-                <button
-                  type="button"
-                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
-                  onClick={() =>
-                    setActiveModal("signup")
-                  }
-                >
-                  Sign up
-                </button>
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
         </nav>
       </header>
 
