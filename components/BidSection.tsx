@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import BidForm from "@/components/BidForm";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,6 +16,8 @@ export default function BidSection({
   currentBid,
   listingStatus,
 }: BidSectionProps) {
+  const router = useRouter();
+
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [liveCurrentBid, setLiveCurrentBid] = useState(currentBid);
@@ -32,6 +35,18 @@ export default function BidSection({
   /*
    * =====================================================
    * REAL-TIME CURRENT BID
+   * =====================================================
+   *
+   * When another user successfully places a bid,
+   * business_listings.current_bid is updated.
+   *
+   * Supabase Realtime receives that UPDATE.
+   *
+   * We:
+   * 1. Update the local BidForm immediately.
+   * 2. Refresh the Next.js server components so that
+   *    Current Bid, Bid History, Total Bids, etc. update.
+   *
    * =====================================================
    */
 
@@ -74,7 +89,21 @@ export default function BidSection({
           );
 
           if (newCurrentBid > 0) {
+            /*
+             * Update the BidForm immediately.
+             */
             setLiveCurrentBid(newCurrentBid);
+
+            /*
+             * Refresh the server-rendered parts of the page.
+             *
+             * This updates:
+             * - Top Current Bid
+             * - Bid History
+             * - Total Bids
+             * - Auction information
+             */
+            router.refresh();
           }
         }
       )
@@ -93,7 +122,7 @@ export default function BidSection({
 
       supabase.removeChannel(channel);
     };
-  }, [listingId, listingStatus]);
+  }, [listingId, listingStatus, router]);
 
   /*
    * =====================================================
