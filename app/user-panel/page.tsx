@@ -1,4 +1,5 @@
 ﻿import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import BidForm from "@/components/BidForm";
 import PanelMobileMenu from "@/components/PanelMobileMenu";
@@ -25,6 +26,12 @@ type MyBid = {
   current_bid: number | string | null;
 };
 
+type PaymentOrder = {
+  listing_id: string;
+  status: string;
+  created_at: string;
+};
+
 export default async function UserPanelPage({
   searchParams,
 }: {
@@ -49,10 +56,6 @@ export default async function UserPanelPage({
 
   /* =====================================================
      MY BUSINESSES
-     
-     IMPORTANT:
-     We use the secure RPC.
-     The RPC uses auth.uid() internally.
      ===================================================== */
 
   const {
@@ -65,10 +68,6 @@ export default async function UserPanelPage({
 
   /* =====================================================
      MY BIDS
-
-     IMPORTANT:
-     We use the secure RPC.
-     The RPC uses auth.uid() internally.
      ===================================================== */
 
   const {
@@ -80,10 +79,78 @@ export default async function UserPanelPage({
     (bidsData ?? []) as MyBid[];
 
   /* =====================================================
+     MY PAYMENT ORDERS
+     
+     We only need payment information for the current
+     user's own listings.
+     ===================================================== */
+
+  const {
+    data: paymentOrdersData,
+    error: paymentOrdersError,
+  } = await supabase
+    .from("payment_orders")
+    .select("listing_id, status, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", {
+      ascending: false,
+    });
+
+  const paymentOrders: PaymentOrder[] =
+    (paymentOrdersData ?? []) as PaymentOrder[];
+
+  /* =====================================================
+     LATEST PAYMENT STATUS BY LISTING
+     ===================================================== */
+
+  const latestPaymentByListing =
+    new Map<string, PaymentOrder>();
+
+  for (const payment of paymentOrders) {
+    if (
+      !latestPaymentByListing.has(
+        payment.listing_id
+      )
+    ) {
+      latestPaymentByListing.set(
+        payment.listing_id,
+        payment
+      );
+    }
+  }
+
+  /* =====================================================
+     PAYMENT PENDING LISTINGS
+     
+     Important:
+     listing_status remains "approved".
+     "Pending" here means payment is incomplete.
+     ===================================================== */
+
+  const isPaymentPending = (
+    business: Business
+  ) => {
+    if (
+      business.listing_status !==
+      "approved"
+    ) {
+      return false;
+    }
+
+    const payment =
+      latestPaymentByListing.get(
+        business.id
+      );
+
+    return payment?.status === "pending";
+  };
+
+  /* =====================================================
      STATUS FILTERS
      ===================================================== */
 
   const validStatusFilters = [
+    "pending",
     "pending_review",
     "approved",
     "live",
@@ -92,36 +159,63 @@ export default async function UserPanelPage({
 
   const filteredBusinesses =
     statusFilter &&
-    validStatusFilters.includes(statusFilter)
-      ? businesses.filter(
-          (business) =>
-            business.listing_status === statusFilter
-        )
+    validStatusFilters.includes(
+      statusFilter
+    )
+      ? businesses.filter((business) => {
+          if (
+            statusFilter ===
+            "pending"
+          ) {
+            return (
+              business.listing_status ===
+                "pending_review" ||
+              isPaymentPending(
+                business
+              )
+            );
+          }
+
+          if (
+            statusFilter ===
+            "approved"
+          ) {
+            return (
+              business.listing_status ===
+                "approved" &&
+              !isPaymentPending(
+                business
+              )
+            );
+          }
+
+          return (
+            business.listing_status ===
+            statusFilter
+          );
+        })
       : businesses;
 
   /* =====================================================
      COUNTS
      ===================================================== */
 
-  const pendingCount = businesses.filter(
-    (business) =>
-      business.listing_status === "pending_review"
-  ).length;
+  const pendingCount =
+    businesses.filter(
+      (business) =>
+        business.listing_status ===
+          "pending_review" ||
+        isPaymentPending(
+          business
+        )
+    ).length;
 
-  const approvedCount = businesses.filter(
-    (business) =>
-      business.listing_status === "approved"
-  ).length;
-
-  const liveCount = businesses.filter(
-    (business) =>
-      business.listing_status === "live"
-  ).length;
-
-  const rejectedCount = businesses.filter(
-    (business) =>
-      business.listing_status === "rejected"
-  ).length;
+  const liveCount =
+    businesses.filter(
+      (business) =>
+        business.listing_status ===
+        "live"
+    ).length;
 
   /* =====================================================
      HELPERS
@@ -136,30 +230,62 @@ export default async function UserPanelPage({
   };
 
   const getStatusLabel = (
-    status: string
+    business: Business
   ) => {
-    return status.replaceAll(
+    if (isPaymentPending(business)) {
+      return "Pending";
+    }
+
+    return business.listing_status.replaceAll(
       "_",
       " "
     );
   };
 
   const getStatusClass = (
-    status: string
+    business: Business
   ) => {
-    if (status === "approved") {
+    if (isPaymentPending(business)) {
+      return "bg-amber-50 text-amber-700";
+    }
+
+    if (
+      business.listing_status ===
+      "approved"
+    ) {
       return "bg-emerald-50 text-emerald-700";
     }
 
-    if (status === "live") {
+    if (
+      business.listing_status ===
+      "live"
+    ) {
       return "bg-blue-50 text-blue-700";
     }
 
-    if (status === "rejected") {
+    if (
+      business.listing_status ===
+      "rejected"
+    ) {
       return "bg-red-50 text-red-700";
     }
 
     return "bg-amber-50 text-amber-700";
+  };
+
+  const getFilterLabel = () => {
+    if (statusFilter === "pending") {
+      return "Pending";
+    }
+
+    if (statusFilter) {
+      return statusFilter.replaceAll(
+        "_",
+        " "
+      );
+    }
+
+    return "";
   };
 
   /* =====================================================
@@ -178,7 +304,7 @@ export default async function UserPanelPage({
 
           {/* LOGO */}
 
-          <a
+          <Link
             href="/"
             className="flex items-center gap-3"
           >
@@ -189,25 +315,25 @@ export default async function UserPanelPage({
             <span className="text-lg font-bold tracking-tight text-slate-950">
               OutbidInd
             </span>
-          </a>
+          </Link>
 
           {/* DESKTOP NAVIGATION */}
 
           <div className="hidden items-center gap-3 sm:flex">
 
-            <a
+            <Link
               href="/live-bids"
               className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
             >
               Live Bids
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/"
               className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             >
               Marketplace
-            </a>
+            </Link>
 
           </div>
 
@@ -252,7 +378,9 @@ export default async function UserPanelPage({
             ERRORS
             ================================================= */}
 
-        {(businessesError || bidsError) && (
+        {(businessesError ||
+          bidsError ||
+          paymentOrdersError) && (
           <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             Some account data could not be loaded.
             Please refresh and try again.
@@ -265,8 +393,8 @@ export default async function UserPanelPage({
 
         <div className="mb-10 grid gap-4 sm:grid-cols-2">
 
-          <a
-            href="/user-panel?status=pending_review#listings"
+          <Link
+            href="/user-panel?status=pending#listings"
             className="block rounded-2xl border border-amber-200 bg-amber-50 p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
           >
             <p className="text-sm font-semibold text-amber-700">
@@ -276,9 +404,13 @@ export default async function UserPanelPage({
             <p className="mt-2 text-3xl font-black text-amber-900">
               {pendingCount}
             </p>
-          </a>
 
-          <a
+            <p className="mt-1 text-xs font-medium text-amber-700">
+              Payment or security review pending
+            </p>
+          </Link>
+
+          <Link
             href="/user-panel?status=live#listings"
             className="block rounded-2xl border border-blue-200 bg-blue-50 p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
           >
@@ -289,7 +421,7 @@ export default async function UserPanelPage({
             <p className="mt-2 text-3xl font-black text-blue-900">
               {liveCount}
             </p>
-          </a>
+          </Link>
 
         </div>
 
@@ -321,10 +453,7 @@ export default async function UserPanelPage({
                   <p className="mt-1 text-sm text-slate-500">
                     Showing{" "}
                     <span className="font-semibold capitalize">
-                      {statusFilter.replaceAll(
-                        "_",
-                        " "
-                      )}
+                      {getFilterLabel()}
                     </span>{" "}
                     businesses.
                   </p>
@@ -338,20 +467,20 @@ export default async function UserPanelPage({
                 validStatusFilters.includes(
                   statusFilter
                 ) && (
-                  <a
+                  <Link
                     href="/user-panel#listings"
                     className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
                   >
                     Show All
-                  </a>
+                  </Link>
                 )}
 
-              <a
+              <Link
                 href="/"
                 className="rounded-lg bg-[#e4572e] px-4 py-2 text-sm font-bold text-white hover:bg-[#c94724]"
               >
                 List Business
-              </a>
+              </Link>
 
             </div>
 
@@ -412,98 +541,139 @@ export default async function UserPanelPage({
                   <tbody className="divide-y divide-slate-100">
 
                     {filteredBusinesses.map(
-                      (business) => (
+                      (business) => {
 
-                        <tr
-                          key={business.id}
-                          className="transition hover:bg-slate-50"
-                        >
+                        const paymentPending =
+                          isPaymentPending(
+                            business
+                          );
 
-                          <td className="px-5 py-5">
+                        return (
 
-                            <p className="font-bold text-slate-950">
-                              {business.business_name}
-                            </p>
+                          <tr
+                            key={business.id}
+                            className={`transition ${
+                              paymentPending
+                                ? "bg-amber-50/40 hover:bg-amber-50"
+                                : "hover:bg-slate-50"
+                            }`}
+                          >
 
-                            <p className="mt-1 text-xs text-slate-500">
-                              {business.category ??
-                                "Uncategorized"}{" "}
-                              ·{" "}
-                              {business.location ??
-                                "Location not provided"}
-                            </p>
+                            {/* BUSINESS */}
 
-                          </td>
+                            <td className="px-5 py-5">
 
-                          <td className="px-5 py-5">
-
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClass(
-                                business.listing_status
-                              )}`}
-                            >
-                              {getStatusLabel(
-                                business.listing_status
-                              )}
-                            </span>
-
-                            {business.rejection_reason && (
-                              <p className="mt-2 max-w-xs text-xs text-red-600">
-                                {business.rejection_reason}
-                              </p>
-                            )}
-
-                          </td>
-
-                          <td className="px-5 py-5 text-sm font-semibold">
-                            {formatMoney(
-                              business.starting_bid
-                            )}
-                          </td>
-
-                          <td className="px-5 py-5 text-sm font-black">
-                            {formatMoney(
-                              business.current_bid
-                            )}
-                          </td>
-
-                          <td className="px-5 py-5">
-
-                            <div className="space-y-3">
-
-                              <a
+                              <Link
                                 href={`/business/${business.id}`}
-                                className="inline-flex rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                className="group block"
                               >
-                                View
-                              </a>
 
-                              {business.listing_status ===
-                                "live" && (
+                                <p className="font-bold text-slate-950 group-hover:text-[#e4572e]">
+                                  {business.business_name}
+                                </p>
 
-                                <div className="w-[260px] rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {business.category ??
+                                    "Uncategorized"}{" "}
+                                  ·{" "}
+                                  {business.location ??
+                                    "Location not provided"}
+                                </p>
 
-                                  <BidForm
-                                    listingId={
-                                      business.id
-                                    }
-                                    currentBid={Number(
-                                      business.current_bid ??
-                                        0
-                                    )}
-                                  />
+                              </Link>
 
-                                </div>
+                            </td>
 
+                            {/* STATUS */}
+
+                            <td className="px-5 py-5">
+
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClass(
+                                  business
+                                )}`}
+                              >
+                                {getStatusLabel(
+                                  business
+                                )}
+                              </span>
+
+                              {paymentPending && (
+                                <p className="mt-2 text-xs font-semibold text-amber-700">
+                                  Complete payment to start auction
+                                </p>
                               )}
 
-                            </div>
+                              {business.rejection_reason && (
+                                <p className="mt-2 max-w-xs text-xs text-red-600">
+                                  {business.rejection_reason}
+                                </p>
+                              )}
 
-                          </td>
+                            </td>
 
-                        </tr>
+                            {/* STARTING BID */}
 
-                      )
+                            <td className="px-5 py-5 text-sm font-semibold">
+                              {formatMoney(
+                                business.starting_bid
+                              )}
+                            </td>
+
+                            {/* CURRENT BID */}
+
+                            <td className="px-5 py-5 text-sm font-black">
+                              {formatMoney(
+                                business.current_bid
+                              )}
+                            </td>
+
+                            {/* ACTION */}
+
+                            <td className="px-5 py-5">
+
+                              <div className="space-y-3">
+
+                                <Link
+                                  href={`/business/${business.id}`}
+                                  className={`inline-flex rounded-lg px-4 py-2 text-xs font-bold transition ${
+                                    paymentPending
+                                      ? "bg-[#e4572e] text-white hover:bg-[#c94724]"
+                                      : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  {paymentPending
+                                    ? "Complete Payment"
+                                    : "View"}
+                                </Link>
+
+                                {business.listing_status ===
+                                  "live" && (
+
+                                  <div className="w-[260px] rounded-xl border border-slate-200 bg-slate-50 p-3">
+
+                                    <BidForm
+                                      listingId={
+                                        business.id
+                                      }
+                                      currentBid={Number(
+                                        business.current_bid ??
+                                          0
+                                      )}
+                                    />
+
+                                  </div>
+
+                                )}
+
+                              </div>
+
+                            </td>
+
+                          </tr>
+
+                        );
+                      }
                     )}
 
                   </tbody>
@@ -553,12 +723,12 @@ export default async function UserPanelPage({
                 in a live auction.
               </p>
 
-              <a
+              <Link
                 href="/live-bids"
                 className="mt-5 inline-flex rounded-lg bg-[#e4572e] px-5 py-3 text-sm font-bold text-white hover:bg-[#c94724]"
               >
                 Browse Live Auctions
-              </a>
+              </Link>
 
             </div>
 
@@ -628,13 +798,13 @@ export default async function UserPanelPage({
 
                             <td className="px-5 py-5">
 
-                              <a
+                              <Link
                                 href={`/business/${bid.listing_id}`}
                                 className="font-bold text-slate-950 hover:text-[#e4572e]"
                               >
                                 {bid.business_name ??
                                   "Business"}
-                              </a>
+                              </Link>
 
                             </td>
 
