@@ -33,52 +33,6 @@ type SubmitBusinessListingResult = {
 
 const MINIMUM_NEW_BUSINESS_BID = 99;
 
-const ALLOWED_CATEGORIES = [
-  "Accounting & Finance",
-  "Advertising & Marketing",
-  "Agriculture",
-  "Automobile",
-  "Bakery",
-  "Beauty & Salon",
-  "Books & Stationery",
-  "Business Services",
-  "Catering",
-  "Clothing & Fashion",
-  "Construction",
-  "Consulting",
-  "Courier & Delivery",
-  "Education & Training",
-  "Electronics",
-  "Entertainment",
-  "Event Management",
-  "Fitness & Gym",
-  "Food & Restaurant",
-  "Furniture",
-  "Healthcare & Medical",
-  "Hotel & Hospitality",
-  "IT & Software",
-  "Jewellery",
-  "Legal Services",
-  "Logistics & Transport",
-  "Manufacturing",
-  "Media & Production",
-  "Mobile & Accessories",
-  "Pet Services",
-  "Pharmacy",
-  "Photography",
-  "Printing",
-  "Real Estate",
-  "Repair & Maintenance",
-  "Retail",
-  "Security Services",
-  "Sports",
-  "Supermarket & Grocery",
-  "Travel & Tourism",
-  "Web Design & Development",
-  "Wholesale",
-  "Other",
-];
-
 function normalizeUrl(value?: string) {
   const trimmed = value?.trim();
 
@@ -298,14 +252,25 @@ export async function submitBusinessListing(
     };
   }
 
-  if (
-    !category ||
-    !ALLOWED_CATEGORIES.includes(category)
-  ) {
+  /*
+   * CATEGORY
+   *
+   * Categories are intentionally independent/free-text.
+   * Users can enter any legitimate business category.
+   */
+
+  if (!category) {
+    return {
+      success: false,
+      error: "Business category is required.",
+    };
+  }
+
+  if (category.length > 200) {
     return {
       success: false,
       error:
-        "Please select a valid business category.",
+        "Business category must be 200 characters or less.",
     };
   }
 
@@ -402,6 +367,7 @@ export async function submitBusinessListing(
    *
    * Business name + location are used for resume matching.
    */
+
   const normalizedBusinessName =
     normalizeText(businessName);
 
@@ -460,6 +426,7 @@ export async function submitBusinessListing(
      *
      * User cannot create another listing.
      */
+
     if (paidPayment) {
       return {
         success: false,

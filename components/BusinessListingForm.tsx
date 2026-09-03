@@ -16,7 +16,7 @@ type Values = {
 
 const emptyValues: Values = {
   businessName: "",
-  category: "Independent",
+  category: "",
   description: "",
   location: "",
   bidAmount: "",
@@ -128,7 +128,7 @@ export function BusinessListingForm({
     try {
       const result = await submitBusinessListing({
         businessName: values.businessName.trim(),
-        category: "Independent",
+        category: values.category.trim(),
         description: values.description.trim(),
         location: values.location.trim(),
         website: values.website.trim(),
@@ -280,15 +280,28 @@ export function BusinessListingForm({
         )}
       </div>
 
-      {/* Category */}
+      {/* Business Category */}
       <div>
         <label className="mb-2 block text-sm font-semibold text-slate-700">
           Business Category
         </label>
 
-        <div className="flex w-full items-center rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          Independent
-        </div>
+        <input
+          type="text"
+          value={values.category}
+          onChange={(event) =>
+            updateValue(
+              "category",
+              event.target.value
+            )
+          }
+          placeholder="Enter your business category"
+          className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+        />
+
+        <p className="mt-1 text-xs text-slate-500">
+          Enter any category that best describes your business.
+        </p>
 
         {errors.category && (
           <p className="mt-1 text-sm text-red-600">
