@@ -782,10 +782,6 @@ export default function Home() {
                 topBusinesses.map(
                   (business, index) => {
 
-                    const website = getWebsiteUrl(
-                      business.business_website
-                    );
-
                     return (
                       <div
                         key={business.id}
@@ -825,30 +821,19 @@ export default function Home() {
 
                         </a>
 
-                        <div className="flex shrink-0 items-center gap-3">
-                          {website && (
-                            <a
-                              href={website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() =>
-                                trackBusinessClick(
-                                  business.id,
-                                  "website"
-                                )
-                              }
-                              className="hidden text-xs font-bold text-slate-500 transition hover:text-[#d94d28] sm:inline"
-                            >
-                              Website ↗
-                            </a>
-                          )}
-
-                          <strong className="text-sm text-slate-900">
+                        <div className="shrink-0 text-right">
+                          <strong className="text-sm font-black text-[#d94d28]">
                             ₹
                             {Number(
                               business.current_bid ?? 0
                             ).toLocaleString("en-IN")}
                           </strong>
+
+                          <p className="mt-1 text-[11px] font-medium text-slate-400">
+                            {Number(
+                              business.click_count ?? 0
+                            ).toLocaleString("en-IN")} clicks
+                          </p>
                         </div>
 
                       </div>
@@ -931,9 +916,9 @@ export default function Home() {
 
           </div>
 
-          <div className="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          <div className="mt-10 overflow-hidden rounded-3xl border-2 border-[#e4572e]/25 bg-white shadow-[0_24px_70px_rgba(228,87,46,0.14)] ring-1 ring-orange-100">
 
-            <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex flex-col gap-3 border-b border-orange-100 bg-orange-50/60 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
 
               <div>
 
@@ -1028,7 +1013,7 @@ export default function Home() {
                         </th>
 
                         <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-[0.12em] text-slate-400 sm:px-6">
-                          Details
+                          Clicks
                         </th>
 
                       </tr>
@@ -1054,7 +1039,7 @@ export default function Home() {
 
                             <tr
                               key={business.id}
-                              className="transition hover:bg-orange-50/40"
+                              className="cursor-pointer transition hover:bg-orange-50/60"
                             >
 
                               <td className="px-5 py-5 sm:px-6">
@@ -1123,34 +1108,11 @@ export default function Home() {
                               </td>
 
                               <td className="px-5 py-5 text-right sm:px-6">
-
-                                <div className="flex flex-col items-end gap-1">
-                                  {website ? (
-                                    <a
-                                      href={website}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={() =>
-                                        trackBusinessClick(
-                                          business.id,
-                                          "website"
-                                        )
-                                      }
-                                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                                    >
-                                      Website ↗
-                                    </a>
-                                  ) : (
-                                    <span className="text-xs font-medium text-slate-400">
-                                      No website
-                                    </span>
-                                  )}
-
-                                  <span className="text-[11px] font-medium text-slate-400">
-                                    {Number(business.click_count ?? 0).toLocaleString("en-IN")} clicks
-                                  </span>
-                                </div>
-
+                                <span className="text-xs font-semibold text-slate-400">
+                                  {Number(
+                                    business.click_count ?? 0
+                                  ).toLocaleString("en-IN")} clicks
+                                </span>
                               </td>
 
                             </tr>
@@ -1189,15 +1151,22 @@ export default function Home() {
 
                           <div className="flex items-start gap-3">
 
-                            <span
-                              className={
-                                globalRank <= 3
-                                  ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#102a43] text-xs font-black text-white"
-                                  : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500"
-                              }
-                            >
-                              #{globalRank}
-                            </span>
+                            <div className="flex w-11 shrink-0 flex-col items-center gap-2">
+                              <span
+                                className={
+                                  globalRank <= 3
+                                    ? "flex h-9 w-9 items-center justify-center rounded-full bg-[#102a43] text-xs font-black text-white"
+                                    : "flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500"
+                                }
+                              >
+                                #{globalRank}
+                              </span>
+
+                              <BusinessLogo
+                                businessName={business.business_name}
+                                website={business.business_website}
+                              />
+                            </div>
 
                             <a
                               href={`/business/${business.id}`}
@@ -1207,31 +1176,24 @@ export default function Home() {
                                   "detail"
                                 )
                               }
-                              className="flex min-w-0 flex-1 items-start gap-3"
+                              className="min-w-0 flex-1"
                             >
+                              <p className="break-words text-[15px] font-black leading-5 text-slate-950 transition hover:text-[#d94d28]">
+                                {business.business_name}
+                              </p>
 
-                              <BusinessLogo
-                                businessName={business.business_name}
-                                website={business.business_website}
-                              />
+                              <p className="mt-1 break-words text-xs leading-4 text-slate-500">
+                                {business.category ?? "Uncategorized"}
+                                {business.location
+                                  ? ` · ${business.location}`
+                                  : ""}
+                              </p>
 
-                              <div className="min-w-0 flex-1">
-                                <p className="break-words text-[15px] font-black leading-5 text-slate-950">
-                                  {business.business_name}
-                                </p>
-
-                                <p className="mt-1 break-words text-xs leading-4 text-slate-500">
-                                  {business.category ?? "Uncategorized"}
-                                  {business.location
-                                    ? ` · ${business.location}`
-                                    : ""}
-                                </p>
-
-                                <p className="mt-2 text-xs font-bold text-slate-400">
-                                  See details ↗
-                                </p>
-                              </div>
-
+                              <p className="mt-2 text-[11px] font-semibold text-slate-400">
+                                {Number(
+                                  business.click_count ?? 0
+                                ).toLocaleString("en-IN")} clicks
+                              </p>
                             </a>
 
                             <div className="shrink-0 text-right">
@@ -1246,35 +1208,6 @@ export default function Home() {
                               </p>
                             </div>
 
-                          </div>
-
-                          <div className="mt-3 pl-[96px]">
-                            {website ? (
-                              <div className="flex flex-col items-start gap-1">
-                                <a
-                                  href={website}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={() =>
-                                    trackBusinessClick(
-                                      business.id,
-                                      "website"
-                                    )
-                                  }
-                                  className="text-xs font-bold text-[#d94d28]"
-                                >
-                                  Visit website ↗
-                                </a>
-
-                                <span className="text-[11px] font-medium text-slate-400">
-                                  {Number(business.click_count ?? 0).toLocaleString("en-IN")} clicks
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-[11px] font-medium text-slate-400">
-                                Website unavailable
-                              </span>
-                            )}
                           </div>
 
                         </div>
