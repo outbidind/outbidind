@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import ApproveButton from "./ApproveButton";
 import RejectButton from "./RejectButton";
@@ -20,6 +21,12 @@ type Listing = {
   ai_review_status: string | null;
   rejection_reason: string | null;
   admin_reviewed_at: string | null;
+  created_at: string;
+};
+
+type PaymentStatus = {
+  listing_id: string;
+  status: string;
   created_at: string;
 };
 
@@ -90,6 +97,30 @@ export default async function AdminPage() {
     (listings ?? []) as Listing[];
 
   /* =========================================================
+     FETCH PAYMENT STATUS
+  ========================================================= */
+
+  // Payment orders are internal data, so use the existing
+  // service-role client only after the admin check above.
+  const { data: paymentOrders, error: paymentOrdersError } =
+    await supabaseAdmin
+      .from("payment_orders")
+      .select("listing_id, status, created_at")
+      .order("created_at", { ascending: false });
+
+  if (paymentOrdersError) {
+    console.error("Admin payment status error:", paymentOrdersError);
+  }
+
+  const latestPaymentByListing = new Map<string, PaymentStatus>();
+
+  for (const payment of (paymentOrders ?? []) as PaymentStatus[]) {
+    if (!latestPaymentByListing.has(payment.listing_id)) {
+      latestPaymentByListing.set(payment.listing_id, payment);
+    }
+  }
+
+  /* =========================================================
      LISTING STATUS FILTERS
   ========================================================= */
 
@@ -137,6 +168,67 @@ export default async function AdminPage() {
     return new Date(
       value
     ).toLocaleString("en-IN");
+  };
+
+  const securityStatus = (status: string | null) => {
+    const normalized = (status ?? "not reviewed").toLowerCase();
+
+    if (normalized === "approved" || normalized === "passed") {
+      return (
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+          Passed
+        </span>
+      );
+    }
+
+    if (normalized === "rejected" || normalized === "failed") {
+      return (
+        <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+          Failed
+        </span>
+      );
+    }
+
+    return (
+      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+        {status ?? "Not reviewed"}
+      </span>
+    );
+  };
+
+  const paymentStatus = (listingId: string) => {
+    const payment = latestPaymentByListing.get(listingId);
+    const status = payment?.status ?? "not started";
+
+    if (status === "paid") {
+      return (
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+          Paid
+        </span>
+      );
+    }
+
+    if (status === "failed" || status === "cancelled") {
+      return (
+        <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+          {status === "failed" ? "Failed" : "Cancelled"}
+        </span>
+      );
+    }
+
+    if (status === "pending") {
+      return (
+        <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+          Pending
+        </span>
+      );
+    }
+
+    return (
+      <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">
+        Not Started
+      </span>
+    );
   };
 
   const statusBadge = (
@@ -443,18 +535,19 @@ export default async function AdminPage() {
 
                     <div className="mt-5 space-y-3 text-sm">
 
-                      <p>
-
+                      <div className="flex flex-wrap items-center gap-3">
                         <span className="font-semibold text-zinc-900">
-                          AI Review:
-                        </span>{" "}
-
-                        <span className="text-zinc-600">
-                          {listing.ai_review_status ??
-                            "Not reviewed"}
+                          Security Status:
                         </span>
+                        {securityStatus(listing.ai_review_status)}
+                      </div>
 
-                      </p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-semibold text-zinc-900">
+                          Payment Status:
+                        </span>
+                        {paymentStatus(listing.id)}
+                      </div>
 
                       {listing.business_website && (
 
@@ -668,8 +761,8 @@ export default async function AdminPage() {
                             </td>
 
                             <td className="px-5 py-5">
-
-                              {hasBid ? (
+                              <div className="flex flex-col gap-2">
+                                {hasBid ? (
 
                                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
                                   Bid Placed
@@ -681,8 +774,9 @@ export default async function AdminPage() {
                                   No Bids Yet
                                 </span>
 
-                              )}
-
+                                )}
+                                {paymentStatus(listing.id)}
+                              </div>
                             </td>
 
                             <td className="px-5 py-5">
@@ -839,9 +933,11 @@ export default async function AdminPage() {
                           </td>
 
                           <td className="px-5 py-5">
-                            {statusBadge(
-                              listing.listing_status
-                            )}
+                            <div className="flex flex-col items-start gap-2">
+                              {statusBadge(listing.listing_status)}
+                              {securityStatus(listing.ai_review_status)}
+                              {paymentStatus(listing.id)}
+                            </div>
                           </td>
 
                           <td className="px-5 py-5 text-sm text-zinc-600">
