@@ -39,10 +39,11 @@ type Bid = {
   created_at: string;
 };
 
-type OwnerListing = {
-  owner_id: string;
-  starting_bid: number | string;
+type MyBusiness = {
+  id: string;
   business_name: string;
+  starting_bid: number | string | null;
+  listing_status: string;
 };
 
 type PaymentOrder = {
@@ -84,27 +85,17 @@ export default async function BusinessPage({
 
   const supabase = await createClient();
 
-  /*
-   * =====================================================
-   * AUTHENTICATED USER
-   * =====================================================
-   *
-   * We only use this to determine whether the current
-   * visitor owns this listing.
-   *
-   * The public listing RPC remains responsible for the
-   * public business data.
-   */
+  /* =====================================================
+     AUTH
+     ===================================================== */
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  /*
-   * =====================================================
-   * PUBLIC BUSINESS LISTING
-   * =====================================================
-   */
+  /* =====================================================
+     PUBLIC BUSINESS LISTING
+     ===================================================== */
 
   const {
     data: listingData,
@@ -137,109 +128,102 @@ export default async function BusinessPage({
     notFound();
   }
 
-  /*
-   * =====================================================
-   * OWNER PAYMENT STATE
-   * =====================================================
-   *
-   * IMPORTANT:
-   * We do NOT expose owner_id through the public RPC.
-   *
-   * This direct query is restricted to the currently
-   * authenticated user's own listing.
-   *
-   * Therefore the payment button is owner-only.
-   */
+  /* =====================================================
+     OWNER CHECK
+     
+     We use the secure "my businesses" RPC.
+     
+     owner_id is NOT exposed to the public page.
+     ===================================================== */
 
   let isOwner = false;
-  let ownerListing: OwnerListing | null = null;
-  let latestPayment: PaymentOrder | null = null;
+  let ownerBusiness: MyBusiness | null = null;
 
   if (user) {
     const {
-      data: ownerListingData,
-      error: ownerListingError,
-    } = await supabase
-      .from("business_listings")
-      .select(
-        "owner_id, starting_bid, business_name"
-      )
-      .eq("id", listing.id)
-      .eq("owner_id", user.id)
-      .maybeSingle();
+      data: myBusinessesData,
+      error: myBusinessesError,
+    } = await supabase.rpc(
+      "get_my_business_listings"
+    );
 
-    if (ownerListingError) {
+    if (myBusinessesError) {
       console.error(
-        "Failed to load owner listing:",
-        ownerListingError
+        "Failed to load owner's businesses:",
+        myBusinessesError
       );
     }
 
-    if (ownerListingData) {
-      ownerListing =
-        ownerListingData as OwnerListing;
+    const myBusinesses =
+      (myBusinessesData ?? []) as MyBusiness[];
 
-      isOwner =
-        ownerListing.owner_id === user.id;
+    ownerBusiness =
+      myBusinesses.find(
+        (business) =>
+          business.id === listing.id
+      ) ?? null;
 
-      /*
-       * Only retrieve payment information for the
-       * authenticated owner.
-       */
+    isOwner = Boolean(ownerBusiness);
+  }
 
-      const {
-        data: paymentData,
-        error: paymentError,
-      } = await supabase
-        .from("payment_orders")
-        .select("status, created_at")
-        .eq("listing_id", listing.id)
-        .eq("user_id", user.id)
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
+  /* =====================================================
+     PAYMENT STATUS
+     
+     Only the authenticated owner can read their own
+     payment order for this listing.
+     ===================================================== */
 
-      if (paymentError) {
-        console.error(
-          "Failed to load payment status:",
-          paymentError
-        );
-      }
+  let latestPayment: PaymentOrder | null =
+    null;
 
-      if (paymentData) {
-        latestPayment =
-          paymentData as PaymentOrder;
-      }
+  if (isOwner && user) {
+    const {
+      data: paymentData,
+      error: paymentError,
+    } = await supabase
+      .from("payment_orders")
+      .select(
+        "status, created_at"
+      )
+      .eq("listing_id", listing.id)
+      .eq("user_id", user.id)
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
+
+    if (paymentError) {
+      console.error(
+        "Failed to load payment status:",
+        paymentError
+      );
+    }
+
+    if (paymentData) {
+      latestPayment =
+        paymentData as PaymentOrder;
     }
   }
 
-  /*
-   * =====================================================
-   * OWNER PAYMENT ACTION
-   * =====================================================
-   *
-   * Payment can only be completed when:
-   *
-   * 1. Current user owns the listing
-   * 2. Listing is approved
-   * 3. Payment is not already paid
-   *
-   * Existing payment API performs the final server-side
-   * ownership/security validation again.
-   */
+  /* =====================================================
+     OWNER PAYMENT ACTION
+     
+     Approved + unpaid = owner can complete payment.
+     
+     If there is no payment order yet, we still allow the
+     owner to start the payment process. The server-side
+     create-order route will create the order securely.
+     ===================================================== */
 
   const canCompletePayment =
     isOwner &&
     listing.listing_status === "approved" &&
     latestPayment?.status !== "paid";
 
-  /*
-   * =====================================================
-   * PUBLIC BID HISTORY
-   * =====================================================
-   */
+  /* =====================================================
+     PUBLIC BID HISTORY
+     ===================================================== */
 
   const {
     data: bidsData,
@@ -261,20 +245,19 @@ export default async function BusinessPage({
   const bidRows =
     (bidsData ?? []) as PublicBidRow[];
 
-  const bidHistory: Bid[] = bidRows.map(
-    (bid): Bid => ({
-      id: bid.id,
-      listing_id: bid.listing_id,
-      amount: Number(bid.amount),
-      created_at: bid.created_at,
-    })
-  );
+  const bidHistory: Bid[] =
+    bidRows.map(
+      (bid): Bid => ({
+        id: bid.id,
+        listing_id: bid.listing_id,
+        amount: Number(bid.amount),
+        created_at: bid.created_at,
+      })
+    );
 
-  /*
-   * =====================================================
-   * CURRENT BID
-   * =====================================================
-   */
+  /* =====================================================
+     CURRENT BID
+     ===================================================== */
 
   const initialCurrentBid = Number(
     listing.current_bid ??
@@ -282,23 +265,21 @@ export default async function BusinessPage({
       0
   );
 
-  /*
-   * =====================================================
-   * BUSINESS WEBSITE
-   * =====================================================
-   */
+  /* =====================================================
+     WEBSITE
+     ===================================================== */
 
   const website = listing.business_website
-    ? listing.business_website.startsWith("http")
+    ? listing.business_website.startsWith(
+        "http"
+      )
       ? listing.business_website
       : `https://${listing.business_website}`
     : null;
 
-  /*
-   * =====================================================
-   * PAGE
-   * =====================================================
-   */
+  /* =====================================================
+     PAGE
+     ===================================================== */
 
   return (
     <main className="min-h-screen bg-[#f6f7f5] text-slate-900">
@@ -384,9 +365,7 @@ export default async function BusinessPage({
 
           <div>
 
-            {/* =================================================
-                BUSINESS HEADER
-                ================================================= */}
+            {/* BUSINESS HEADER */}
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
@@ -420,8 +399,12 @@ export default async function BusinessPage({
 
                       </span>
                     ) : canCompletePayment ? (
-                      <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+
+                        <span className="h-2 w-2 rounded-full bg-amber-500" />
+
                         PAYMENT PENDING
+
                       </span>
                     ) : (
                       <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
@@ -449,9 +432,7 @@ export default async function BusinessPage({
 
               </div>
 
-              {/* =================================================
-                  BUSINESS INFORMATION
-                  ================================================= */}
+              {/* BUSINESS INFORMATION */}
 
               <div className="p-7 sm:p-10">
 
@@ -519,7 +500,7 @@ export default async function BusinessPage({
                     listing.business_name
                   }
                   bidAmount={Number(
-                    ownerListing?.starting_bid ??
+                    ownerBusiness?.starting_bid ??
                       listing.starting_bid
                   )}
                 />
@@ -643,9 +624,7 @@ export default async function BusinessPage({
 
             <div className="sticky top-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
 
-              {/* =================================================
-                  CURRENT BID
-                  ================================================= */}
+              {/* CURRENT BID */}
 
               <div className="bg-[#102a43] p-7 text-white sm:p-8">
 
@@ -715,7 +694,7 @@ export default async function BusinessPage({
               </div>
 
               {/* =================================================
-                  BID FORM
+                  BID / PAYMENT AREA
                   ================================================= */}
 
               <div className="p-7 sm:p-8">
@@ -735,12 +714,19 @@ export default async function BusinessPage({
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
 
                     <p className="text-sm font-bold text-amber-800">
-                      Auction not live yet
+                      Payment required
                     </p>
 
                     <p className="mt-2 text-sm leading-6 text-amber-700">
-                      Complete the listing payment above
-                      to start this auction.
+                      Complete the payment above to
+                      start this auction.
+                    </p>
+
+                    <p className="mt-4 text-lg font-black text-amber-900">
+                      {formatMoney(
+                        ownerBusiness?.starting_bid ??
+                          listing.starting_bid
+                      )}
                     </p>
 
                   </div>
