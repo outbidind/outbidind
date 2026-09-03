@@ -410,13 +410,6 @@ export default function Home() {
                 Live Bids
               </a>
 
-              <a
-                className="transition hover:text-[#d94d28]"
-                href="#how-it-works"
-              >
-                How It Works
-              </a>
-
               <button
                 type="button"
                 className="transition hover:text-[#d94d28]"
@@ -551,16 +544,6 @@ export default function Home() {
                   className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
                 >
                   Live Bids
-                </a>
-
-                <a
-                  href="#how-it-works"
-                  onClick={() =>
-                    setMobileMenuOpen(false)
-                  }
-                  className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
-                >
-                  How It Works
                 </a>
 
                 <button
@@ -1664,75 +1647,6 @@ export default function Home() {
 
       </section>
 
-      {/* ================= HOW IT WORKS ================= */}
-
-      <section
-        id="how-it-works"
-        className="mx-auto max-w-7xl px-5 py-20 sm:px-8"
-      >
-
-        <div className="max-w-2xl">
-
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#d94d28]">
-            A clearer path forward
-          </p>
-
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-            From discovery to opportunity.
-          </h2>
-
-        </div>
-
-        <div className="mt-12 grid gap-8 md:grid-cols-4">
-
-          {[
-            [
-              "01",
-              "Discover",
-              "Find businesses available on OutbidInd.",
-            ],
-            [
-              "02",
-              "Review",
-              "Explore the business information and official website.",
-            ],
-            [
-              "03",
-              "Bid",
-              "Participate in continuous competitive bidding.",
-            ],
-            [
-              "04",
-              "Win",
-              "Become the successful bidder when the bidding process ends.",
-            ],
-          ].map(
-            ([number, title, copy]) => (
-              <div
-                key={number}
-                className="border-t-2 border-slate-200 pt-5"
-              >
-
-                <span className="text-sm font-bold text-[#d94d28]">
-                  {number}
-                </span>
-
-                <h3 className="mt-5 text-xl font-bold text-slate-950">
-                  {title}
-                </h3>
-
-                <p className="mt-3 text-sm leading-6 text-slate-500">
-                  {copy}
-                </p>
-
-              </div>
-            )
-          )}
-
-        </div>
-
-      </section>
-
       {/* ================= TRUST ================= */}
 
       <section className="bg-[#102a43] text-white">
@@ -1899,13 +1813,6 @@ export default function Home() {
             >
               List Your Business
             </button>
-
-            <a
-              href="#how-it-works"
-              className="hover:text-[#d94d28]"
-            >
-              How It Works
-            </a>
 
             <a
               href="#coming-soon"
