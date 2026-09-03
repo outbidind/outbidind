@@ -16,59 +16,13 @@ type Values = {
 
 const emptyValues: Values = {
   businessName: "",
-  category: "",
+  category: "Independent",
   description: "",
   location: "",
   bidAmount: "",
   website: "",
   additionalInformation: "",
 };
-
-const businessCategories = [
-  "Accounting & Finance",
-  "Advertising & Marketing",
-  "Agriculture",
-  "Automobile",
-  "Bakery",
-  "Beauty & Salon",
-  "Books & Stationery",
-  "Business Services",
-  "Catering",
-  "Clothing & Fashion",
-  "Construction",
-  "Consulting",
-  "Courier & Delivery",
-  "Education & Training",
-  "Electronics",
-  "Entertainment",
-  "Event Management",
-  "Fitness & Gym",
-  "Food & Restaurant",
-  "Furniture",
-  "Healthcare & Medical",
-  "Hotel & Hospitality",
-  "IT & Software",
-  "Jewellery",
-  "Legal Services",
-  "Logistics & Transport",
-  "Manufacturing",
-  "Media & Production",
-  "Mobile & Accessories",
-  "Pet Services",
-  "Pharmacy",
-  "Photography",
-  "Printing",
-  "Real Estate",
-  "Repair & Maintenance",
-  "Retail",
-  "Security Services",
-  "Sports",
-  "Supermarket & Grocery",
-  "Travel & Tourism",
-  "Web Design & Development",
-  "Wholesale",
-  "Other",
-];
 
 export function BusinessListingForm({
   onSuccess,
@@ -92,9 +46,6 @@ export function BusinessListingForm({
     bidAmount: number;
   } | null>(null);
 
-  const [categoryOpen, setCategoryOpen] = useState(false);
-  const [categorySearch, setCategorySearch] = useState("");
-
   const updateValue = (field: keyof Values, value: string) => {
     setValues((current) => ({
       ...current,
@@ -109,10 +60,6 @@ export function BusinessListingForm({
     setMessage("");
   };
 
-  const filteredCategories = businessCategories.filter((category) =>
-    category.toLowerCase().includes(categorySearch.toLowerCase())
-  );
-
   const validate = () => {
     const nextErrors: Partial<Record<keyof Values, string>> = {};
 
@@ -121,7 +68,7 @@ export function BusinessListingForm({
     }
 
     if (!values.category.trim()) {
-      nextErrors.category = "Please select a business category.";
+      nextErrors.category = "Business category is required.";
     }
 
     if (!values.description.trim()) {
@@ -181,7 +128,7 @@ export function BusinessListingForm({
     try {
       const result = await submitBusinessListing({
         businessName: values.businessName.trim(),
-        category: values.category.trim(),
+        category: "Independent",
         description: values.description.trim(),
         location: values.location.trim(),
         website: values.website.trim(),
@@ -334,107 +281,14 @@ export function BusinessListingForm({
       </div>
 
       {/* Category */}
-      <div className="relative">
+      <div>
         <label className="mb-2 block text-sm font-semibold text-slate-700">
           Business Category
         </label>
 
-        <button
-          type="button"
-          onClick={() => {
-            setCategoryOpen((current) => !current);
-            setCategorySearch("");
-          }}
-          className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-4 py-3 text-left text-sm outline-none transition hover:border-orange-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-        >
-          <span
-            className={
-              values.category
-                ? "text-slate-900"
-                : "text-slate-400"
-            }
-          >
-            {values.category ||
-              "Select a business category"}
-          </span>
-
-          <svg
-            className={`h-5 w-5 text-slate-400 transition-transform ${
-              categoryOpen ? "rotate-180" : ""
-            }`}
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-
-        {categoryOpen && (
-          <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-            <div className="border-b border-slate-100 p-3">
-              <div className="relative">
-                <svg
-                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M8.5 3a5.5 5.5 0 104.28 8.95l3.63 3.63a.75.75 0 101.06-1.06l-3.63-3.63A5.5 5.5 0 008.5 3zM4.5 8.5a4 4 0 118 0 4 4 0 01-8 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-
-                <input
-                  type="text"
-                  autoFocus
-                  value={categorySearch}
-                  onChange={(event) =>
-                    setCategorySearch(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Search business category..."
-                  className="w-full rounded-lg border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                />
-              </div>
-            </div>
-
-            <div className="max-h-64 overflow-y-auto p-2">
-              {filteredCategories.length > 0 ? (
-                filteredCategories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => {
-                      updateValue(
-                        "category",
-                        category
-                      );
-                      setCategoryOpen(false);
-                      setCategorySearch("");
-                    }}
-                    className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition hover:bg-orange-50 hover:text-orange-700 ${
-                      values.category === category
-                        ? "bg-orange-50 font-semibold text-orange-700"
-                        : "text-slate-700"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))
-              ) : (
-                <div className="px-3 py-6 text-center text-sm text-slate-500">
-                  No business category found.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <div className="flex w-full items-center rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Independent
+        </div>
 
         {errors.category && (
           <p className="mt-1 text-sm text-red-600">
