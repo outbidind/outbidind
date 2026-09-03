@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Bid = {
@@ -35,6 +36,8 @@ export default function RealtimeBusiness({
   initialBids,
   children,
 }: RealtimeBusinessProps) {
+  const router = useRouter();
+
   const [currentBid, setCurrentBid] =
     useState(initialCurrentBid);
 
@@ -58,6 +61,7 @@ export default function RealtimeBusiness({
         (payload) => {
           const updated = payload.new as {
             current_bid?: number | string;
+            listing_status?: string;
           };
 
           const newCurrentBid = Number(
@@ -65,6 +69,17 @@ export default function RealtimeBusiness({
           );
 
           setCurrentBid(newCurrentBid);
+
+          /*
+           * Payment verification changes:
+           *
+           * approved → live
+           *
+           * Refresh the Next.js Server Component so the
+           * pending payment UI changes to the LIVE auction
+           * automatically without a browser reload.
+           */
+          router.refresh();
         }
       )
 
@@ -116,7 +131,7 @@ export default function RealtimeBusiness({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [listingId]);
+  }, [listingId, router]);
 
   return (
     <RealtimeBusinessContext.Provider
