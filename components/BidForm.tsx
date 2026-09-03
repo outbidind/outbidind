@@ -3,12 +3,6 @@
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type BidFormProps = {
-  listingId: string;
-  currentBid: number;
-  onSuccess?: (newBid: number) => void;
-};
-
 type RazorpayOptions = {
   key: string;
   amount: number;
@@ -16,43 +10,47 @@ type RazorpayOptions = {
   name: string;
   description: string;
   order_id: string;
-
-  config?: {
-    display: {
-      blocks: {
-        payment_methods: {
-          name: string;
-          instruments: {
-            method: "upi" | "card";
-          }[];
-        };
-      };
-
-      hide: {
-        method:
-          | "emi"
-          | "netbanking"
-          | "wallet"
-          | "paylater";
-      }[];
-
-      sequence: string[];
-
-      preferences: {
-        show_default_blocks: boolean;
-      };
-    };
-  };
-
-  handler: (response: {
-    razorpay_payment_id: string;
-    razorpay_order_id: string;
-    razorpay_signature: string;
-  }) => void;
+  handler: (response: RazorpayResponse) => void;
 
   modal?: {
     ondismiss?: () => void;
   };
+
+  theme?: {
+    color?: string;
+  };
+
+  config?: {
+    display?: {
+      blocks?: {
+        upi?: {
+          name: string;
+          instruments: {
+            method: string;
+          }[];
+        };
+
+        card?: {
+          name: string;
+          instruments: {
+            method: string;
+          }[];
+        };
+      };
+
+      sequence?: string[];
+
+      preferences?: {
+        show_default_blocks?: boolean;
+      };
+    };
+  };
+};
+
+type RazorpayResponse = {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
 };
 
 type RazorpayInstance = {
@@ -63,301 +61,292 @@ type RazorpayConstructor = new (
   options: RazorpayOptions
 ) => RazorpayInstance;
 
+type BidFormProps = {
+  listingId: string;
+  currentBid: number;
+  onSuccess?: (newCurrentBid: number) => void;
+};
+
+const MINIMUM_BID = 99;
+
 export default function BidForm({
   listingId,
   currentBid,
   onSuccess,
 }: BidFormProps) {
-  const [amount, setAmount] = useState("");
+  const [bidAmount, setBidAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const minimumBid = Math.floor(Number(currentBid)) + 1;
+  // =====================================================
+  // LOAD RAZORPAY SCRIPT
+  // =====================================================
 
-  const loadRazorpay = async () => {
-    const existingRazorpay = (
+  const loadRazorpay = async (): Promise<boolean> => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    const razorpayWindow =
       window as Window & {
         Razorpay?: RazorpayConstructor;
-      }
-    ).Razorpay;
+      };
 
-    if (existingRazorpay) {
+    if (razorpayWindow.Razorpay) {
       return true;
     }
 
     return new Promise<boolean>((resolve) => {
-      const script = document.createElement("script");
+      const existingScript =
+        document.querySelector(
+          'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+        );
+
+      if (existingScript) {
+        existingScript.addEventListener(
+          "load",
+          () => resolve(true),
+          { once: true }
+        );
+
+        existingScript.addEventListener(
+          "error",
+          () => resolve(false),
+          { once: true }
+        );
+
+        return;
+      }
+
+      const script =
+        document.createElement("script");
 
       script.src =
         "https://checkout.razorpay.com/v1/checkout.js";
 
-      script.onload = () => {
-        resolve(true);
-      };
+      script.async = true;
 
-      script.onerror = () => {
-        resolve(false);
-      };
+      script.onload = () => resolve(true);
+
+      script.onerror = () => resolve(false);
 
       document.body.appendChild(script);
     });
   };
 
-  const handleSubmit = async (
+  // =====================================================
+  // SUBMIT BID
+  // =====================================================
+
+  async function handleSubmit(
     event: FormEvent<HTMLFormElement>
-  ) => {
+  ) {
     event.preventDefault();
 
+    setMessage("");
     setError("");
-    setSuccess("");
 
-    const bidAmount = Number(amount);
+    const amount = Number(bidAmount);
+
+    // =====================================================
+    // MINIMUM BID VALIDATION
+    // =====================================================
 
     if (
-      !Number.isFinite(bidAmount) ||
-      bidAmount <= 0
+      !Number.isFinite(amount) ||
+      amount < MINIMUM_BID
     ) {
-      setError("Please enter a valid bid amount.");
-      return;
-    }
-
-    if (bidAmount <= Number(currentBid)) {
       setError(
-        `Your bid must be higher than ₹${Number(
-          currentBid
-        ).toLocaleString("en-IN")}.`
+        "Minimum bid amount is ₹99."
       );
       return;
     }
 
-    setIsSubmitting(true);
+    setLoading(true);
 
     try {
-      // ===================================================
-      // 1. VERIFY LOGGED-IN USER
-      // ===================================================
-
       const supabase = createClient();
+
+      // =====================================================
+      // AUTH CHECK
+      // =====================================================
 
       const {
         data: { user },
-        error: authError,
       } = await supabase.auth.getUser();
 
-      if (authError || !user) {
+      if (!user) {
         setError(
           "You must be logged in to place a bid."
         );
+
+        setLoading(false);
         return;
       }
 
-      // ===================================================
-      // 2. GET LATEST LISTING DATA
-      // ===================================================
+      // =====================================================
+      // FRESH LISTING CHECK
+      // =====================================================
 
       const {
-        data: listing,
+        data: latestListing,
         error: listingError,
       } = await supabase
         .from("business_listings")
         .select(
-          "id, listing_status, current_bid"
+          "id, current_bid, listing_status"
         )
         .eq("id", listingId)
         .maybeSingle();
 
-      if (listingError) {
-        console.error(
-          "Listing lookup error:",
-          listingError
-        );
-
+      if (
+        listingError ||
+        !latestListing
+      ) {
         setError(
-          "Unable to verify the current bid. Please try again."
+          "Unable to verify the business listing."
         );
 
+        setLoading(false);
         return;
       }
 
-      if (!listing) {
+      // =====================================================
+      // ONLY LIVE AUCTIONS CAN RECEIVE BIDS
+      // =====================================================
+
+      if (
+        latestListing.listing_status !==
+        "live"
+      ) {
         setError(
-          "This business listing could not be found."
+          "Bidding is only available for live auctions."
         );
 
+        setLoading(false);
         return;
       }
 
-      if (listing.listing_status !== "live") {
-        setError(
-          "Bidding is currently unavailable for this business."
-        );
-
-        return;
-      }
-
-      const latestCurrentBid =
-        Number(listing.current_bid);
-
-      if (!Number.isFinite(latestCurrentBid)) {
-        setError(
-          "Unable to verify the current bid."
-        );
-
-        return;
-      }
-
-      if (bidAmount <= latestCurrentBid) {
-        setError(
-          `The current bid has changed to ₹${latestCurrentBid.toLocaleString(
-            "en-IN"
-          )}. Please enter a higher amount.`
-        );
-
-        return;
-      }
-
-      // ===================================================
-      // 3. LOAD RAZORPAY CHECKOUT
-      // ===================================================
+      // =====================================================
+      // RAZORPAY SCRIPT
+      // =====================================================
 
       const razorpayLoaded =
         await loadRazorpay();
 
-      const Razorpay = (
-        window as Window & {
-          Razorpay?: RazorpayConstructor;
-        }
-      ).Razorpay;
-
-      if (
-        !razorpayLoaded ||
-        !Razorpay
-      ) {
+      if (!razorpayLoaded) {
         setError(
           "Unable to load the payment system. Please try again."
         );
 
+        setLoading(false);
         return;
       }
 
-      // ===================================================
-      // 4. CREATE BID PAYMENT ORDER
-      // ===================================================
+      // =====================================================
+      // CREATE SERVER-SIDE PAYMENT ORDER
+      // =====================================================
 
-      const orderResponse =
+      const createOrderResponse =
         await fetch(
           "/api/bids/create-order",
           {
             method: "POST",
+
             headers: {
               "Content-Type":
                 "application/json",
             },
+
             body: JSON.stringify({
               listingId,
-              amount: bidAmount,
+              amount,
             }),
           }
         );
 
-      const orderData =
-        await orderResponse.json();
+      const createOrderData =
+        await createOrderResponse
+          .json()
+          .catch(() => null);
 
       if (
-        !orderResponse.ok ||
-        !orderData?.success
+        !createOrderResponse.ok ||
+        !createOrderData?.success
       ) {
         setError(
-          orderData?.error ||
-            "Unable to create bid payment order."
+          createOrderData?.error ??
+            "Unable to create bid payment."
         );
 
+        setLoading(false);
         return;
       }
 
-      // ===================================================
-      // 5. OPEN RAZORPAY CHECKOUT
-      // ===================================================
+      // =====================================================
+      // RAZORPAY OPTIONS
+      // =====================================================
 
-      const razorpayOptions: RazorpayOptions = {
-        key: orderData.keyId,
-        amount: orderData.amount,
-        currency: orderData.currency,
+      const options: RazorpayOptions = {
+        key: createOrderData.keyId,
+
+        amount: createOrderData.amount,
+
+        currency:
+          createOrderData.currency ??
+          "INR",
+
         name: "OutbidInd",
+
         description:
-          `Bid for ${orderData.businessName}`,
-        order_id: orderData.orderId,
+          `Bid payment for ${
+            createOrderData.businessName ??
+            "business auction"
+          }`,
 
-        // =================================================
-        // ONLY UPI + CARD
-        // =================================================
-        config: {
-          display: {
-            blocks: {
-              payment_methods: {
-                name: "Pay via UPI or Card",
-                instruments: [
-                  {
-                    method: "upi",
-                  },
-                  {
-                    method: "card",
-                  },
-                ],
-              },
-            },
+        order_id:
+          createOrderData.orderId,
 
-            // Explicitly hide unwanted methods
-            hide: [
-              {
-                method: "emi",
-              },
-              {
-                method: "netbanking",
-              },
-              {
-                method: "wallet",
-              },
-              {
-                method: "paylater",
-              },
-            ],
+        // ===================================================
+        // PAYMENT SUCCESS HANDLER
+        // ===================================================
 
-            // Only our custom block
-            sequence: [
-              "block.payment_methods",
-            ],
-
-            // Do not show Razorpay's default methods
-            preferences: {
-              show_default_blocks: false,
-            },
-          },
-        },
-
-        handler: async (response) => {
+        handler: async (
+          response
+        ) => {
           try {
-            setSuccess(
-              "Payment received. Verifying your bid..."
+            setMessage(
+              "Verifying your payment..."
             );
+
+            setError("");
+
+            // ===============================================
+            // SERVER-SIDE PAYMENT VERIFICATION
+            // ===============================================
 
             const verifyResponse =
               await fetch(
                 "/api/bids/verify-payment",
                 {
                   method: "POST",
+
                   headers: {
                     "Content-Type":
                       "application/json",
                   },
+
                   body: JSON.stringify({
                     paymentOrderId:
-                      orderData.paymentOrderId,
+                      createOrderData.paymentOrderId,
+
                     razorpay_payment_id:
                       response.razorpay_payment_id,
+
                     razorpay_order_id:
                       response.razorpay_order_id,
+
                     razorpay_signature:
                       response.razorpay_signature,
                   }),
@@ -365,162 +354,304 @@ export default function BidForm({
               );
 
             const verifyData =
-              await verifyResponse.json();
+              await verifyResponse
+                .json()
+                .catch(() => null);
+
+            // ===============================================
+            // VERIFICATION FAILED
+            // ===============================================
 
             if (
               !verifyResponse.ok ||
               !verifyData?.success
             ) {
+              setMessage("");
+
               setError(
-                verifyData?.error ||
-                  "Payment verification failed."
+                verifyData?.error ??
+                  "Payment was verified but the bid could not be completed."
               );
 
-              setSuccess("");
+              setLoading(false);
               return;
             }
+
+            // ===============================================
+            // VERIFIED BID AMOUNT
+            // ===============================================
 
             const verifiedBidAmount =
               Number(
                 verifyData?.bid?.amount ??
-                  bidAmount
+                  amount
               );
 
-            setSuccess(
-              `Bid of ₹${verifiedBidAmount.toLocaleString(
+            // ===============================================
+            // ACCUMULATED AUCTION TOTAL
+            // ===============================================
+
+            const newCurrentBid =
+              Number(
+                verifyData?.newCurrentBid ??
+                  verifyData?.bid
+                    ?.new_current_bid ??
+                  verifyData?.bid
+                    ?.current_bid ??
+                  Number(currentBid) +
+                    verifiedBidAmount
+              );
+
+            // ===============================================
+            // SUCCESS
+            // ===============================================
+
+            setMessage(
+              `₹${verifiedBidAmount.toLocaleString(
                 "en-IN"
-              )} is now live.`
+              )} added to the auction total.`
             );
 
-            setAmount("");
-            onSuccess?.(verifiedBidAmount);
-          } catch (verificationError) {
+            setBidAmount("");
+
+            onSuccess?.(
+              newCurrentBid
+            );
+
+            setLoading(false);
+          } catch (
+            verificationError
+          ) {
             console.error(
               "Bid payment verification error:",
               verificationError
             );
 
+            setMessage("");
+
             setError(
-              "Payment was received, but bid verification failed. Please try again."
+              "Payment verification failed. Please try again."
             );
 
-            setSuccess("");
-          } finally {
-            setIsSubmitting(false);
+            setLoading(false);
           }
         },
 
+        // ===================================================
+        // RAZORPAY CLOSED
+        // ===================================================
+
         modal: {
           ondismiss: () => {
-            setIsSubmitting(false);
-            setSuccess("");
+            setMessage("");
+            setLoading(false);
+          },
+        },
+
+        // ===================================================
+        // RAZORPAY THEME
+        // ===================================================
+
+        theme: {
+          color: "#e4572e",
+        },
+
+        // ===================================================
+        // ONLY UPI + CARD
+        // ===================================================
+
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay using UPI",
+
+                instruments: [
+                  {
+                    method: "upi",
+                  },
+                ],
+              },
+
+              card: {
+                name: "Pay using Card",
+
+                instruments: [
+                  {
+                    method: "card",
+                  },
+                ],
+              },
+            },
+
+            sequence: [
+              "block.upi",
+              "block.card",
+            ],
+
+            preferences: {
+              show_default_blocks: false,
+            },
           },
         },
       };
 
+      // =====================================================
+      // GET RAZORPAY CONSTRUCTOR
+      // =====================================================
+      //
+      // IMPORTANT:
+      // We are NOT declaring window.Razorpay globally.
+      // This prevents the duplicate declaration conflict
+      // with PaymentPage.tsx.
+      //
+
+      const razorpayWindow =
+        window as Window & {
+          Razorpay?: RazorpayConstructor;
+        };
+
+      const RazorpayConstructor =
+        razorpayWindow.Razorpay;
+
+      if (!RazorpayConstructor) {
+        setError(
+          "Razorpay is not loaded. Please refresh and try again."
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      // =====================================================
+      // OPEN RAZORPAY
+      // =====================================================
+
       const razorpay =
-        new Razorpay(
-          razorpayOptions
+        new RazorpayConstructor(
+          options
         );
 
       razorpay.open();
     } catch (submitError) {
       console.error(
-        "Bid payment error:",
+        "Bid submission error:",
         submitError
       );
 
       setError(
-        "Unable to process your bid. Please try again."
+        "Unable to start the bid payment."
       );
 
-      setIsSubmitting(false);
+      setLoading(false);
     }
-  };
+  }
+
+  // =======================================================
+  // UI
+  // =======================================================
 
   return (
     <form
       onSubmit={handleSubmit}
       className="space-y-5"
     >
+      {/* AUCTION TOTAL */}
+
       <div>
-        <p className="text-sm text-slate-500">
-          Current bid
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+          Auction total
         </p>
 
-        <p className="mt-1 text-2xl font-bold text-slate-950">
+        <p className="mt-1 text-2xl font-black text-slate-950">
           ₹
-          {Number(currentBid).toLocaleString(
-            "en-IN"
-          )}
+          {Number(
+            currentBid
+          ).toLocaleString("en-IN")}
         </p>
       </div>
 
+      {/* BID INPUT */}
+
       <div>
         <label
-          htmlFor="bid-amount"
-          className="block text-sm font-bold text-slate-800"
+          htmlFor={`bid-amount-${listingId}`}
+          className="text-sm font-bold text-slate-800"
         >
-          Your bid
+          Your bid amount
         </label>
 
         <div className="relative mt-2">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-slate-500">
+          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
             ₹
           </span>
 
           <input
-            id="bid-amount"
+            id={`bid-amount-${listingId}`}
             type="number"
-            min={minimumBid}
+            min={MINIMUM_BID}
             step="1"
-            value={amount}
-            onChange={(event) => {
-              setAmount(event.target.value);
-              setError("");
-              setSuccess("");
-            }}
-            placeholder={`More than ${Number(
-              currentBid
-            ).toLocaleString("en-IN")}`}
-            disabled={isSubmitting}
-            className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-8 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#e4572e] focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+            value={bidAmount}
+            onChange={(event) =>
+              setBidAmount(
+                event.target.value
+              )
+            }
+            placeholder="Minimum ₹99"
+            disabled={loading}
+            className="w-full rounded-xl border border-slate-300 bg-white py-3.5 pl-9 pr-4 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#e4572e] focus:ring-4 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-50"
           />
         </div>
 
-        <p className="mt-2 text-xs text-slate-500">
-          Your bid must be higher than the current
-          bid.
+        <p className="mt-2 text-xs leading-5 text-slate-400">
+          Minimum bid is ₹99. You can bid
+          any amount of ₹99 or more.
         </p>
       </div>
 
+      {/* ERROR */}
+
       {error && (
-        <p
+        <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700"
         >
           {error}
-        </p>
+        </div>
       )}
 
-      {success && (
-        <p
+      {/* SUCCESS */}
+
+      {message && (
+        <div
           role="status"
-          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-700"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-700"
         >
-          {success}
-        </p>
+          {message}
+        </div>
       )}
+
+      {/* BUTTON */}
 
       <button
         type="submit"
-        disabled={isSubmitting}
-        className="w-full rounded-lg bg-[#e4572e] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 disabled:cursor-wait disabled:opacity-70"
+        disabled={
+          loading ||
+          !bidAmount
+        }
+        className="w-full rounded-xl bg-[#e4572e] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#c94724] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isSubmitting
-          ? "Opening Payment..."
-          : "Continue"}
+        {loading
+          ? "Processing..."
+          : "Pay & Place Bid"}
       </button>
+
+      {/* PAYMENT NOTE */}
+
+      <p className="text-center text-[11px] leading-5 text-slate-400">
+        Your bid becomes active only after
+        successful payment verification.
+      </p>
     </form>
   );
 }

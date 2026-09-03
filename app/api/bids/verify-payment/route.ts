@@ -1,16 +1,24 @@
+import {
+  createHmac,
+} from "crypto";
+
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-export async function POST(request: Request) {
-  try {
-    // =====================================================
-    // 1. VERIFY LOGGED-IN USER
-    // =====================================================
+const MINIMUM_BID = 99;
 
-    const supabase = await createClient();
+export async function POST(
+  request: Request
+) {
+  try {
+    const supabase =
+      await createClient();
+
+    // =====================================================
+    // 1. AUTH
+    // =====================================================
 
     const {
       data: { user },
@@ -20,17 +28,19 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "You must be logged in.",
+          error:
+            "You must be logged in.",
         },
         { status: 401 }
       );
     }
 
     // =====================================================
-    // 2. GET PAYMENT DATA
+    // 2. REQUEST BODY
     // =====================================================
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const paymentOrderId =
       body?.paymentOrderId;
@@ -46,9 +56,17 @@ export async function POST(request: Request) {
 
     if (
       !paymentOrderId ||
+      typeof paymentOrderId !==
+        "string" ||
       !razorpayPaymentId ||
+      typeof razorpayPaymentId !==
+        "string" ||
       !razorpayOrderId ||
-      !razorpaySignature
+      typeof razorpayOrderId !==
+        "string" ||
+      !razorpaySignature ||
+      typeof razorpaySignature !==
+        "string"
     ) {
       return NextResponse.json(
         {
@@ -61,7 +79,7 @@ export async function POST(request: Request) {
     }
 
     // =====================================================
-    // 3. GET LOCAL PAYMENT ORDER
+    // 3. LOAD LOCAL PAYMENT ORDER
     // =====================================================
 
     const {
@@ -71,25 +89,31 @@ export async function POST(request: Request) {
       .from("payment_orders")
       .select(
         `
-        id,
-        listing_id,
-        user_id,
-        amount,
-        currency,
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-        status,
-        created_at
+          id,
+          listing_id,
+          user_id,
+          amount,
+          currency,
+          razorpay_order_id,
+          razorpay_payment_id,
+          razorpay_signature,
+          status,
+          created_at
         `
       )
-      .eq("id", paymentOrderId)
-      .eq("user_id", user.id)
+      .eq(
+        "id",
+        paymentOrderId
+      )
+      .eq(
+        "user_id",
+        user.id
+      )
       .maybeSingle();
 
     if (paymentOrderError) {
       console.error(
-        "Bid payment order lookup error:",
+        "Payment order lookup error:",
         paymentOrderError
       );
 
@@ -97,7 +121,7 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            "Unable to verify the bid payment order.",
+            "Unable to verify payment order.",
         },
         { status: 500 }
       );
@@ -108,14 +132,89 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            "Payment order not found or unauthorized.",
+            "Payment order was not found.",
         },
         { status: 404 }
       );
     }
 
     // =====================================================
-    // 4. VERIFY RAZORPAY ORDER ID
+    // 4. DUPLICATE / REPLAY PROTECTION
+    // =====================================================
+
+    if (
+      paymentOrder.status ===
+      "paid"
+    ) {
+      const {
+        data: existingBid,
+      } = await supabaseAdmin
+        .from("bids")
+        .select(
+          "id, listing_id, bidder_id, amount, created_at"
+        )
+        .eq(
+          "listing_id",
+          paymentOrder.listing_id
+        )
+        .eq(
+          "bidder_id",
+          user.id
+        )
+        .eq(
+          "amount",
+          Number(paymentOrder.amount)
+        )
+        .gte(
+          "created_at",
+          paymentOrder.created_at
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false,
+          }
+        )
+        .limit(1)
+        .maybeSingle();
+
+      if (existingBid) {
+        const {
+          data: currentListing,
+        } = await supabaseAdmin
+          .from("business_listings")
+          .select(
+            "current_bid"
+          )
+          .eq(
+            "id",
+            paymentOrder.listing_id
+          )
+          .maybeSingle();
+
+        return NextResponse.json({
+          success: true,
+          bid: existingBid,
+          newCurrentBid:
+            Number(
+              currentListing?.current_bid ??
+                0
+            ),
+        });
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "This payment was already processed but its bid record could not be recovered.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // =====================================================
+    // 5. RAZORPAY ORDER ID MATCH
     // =====================================================
 
     if (
@@ -133,17 +232,41 @@ export async function POST(request: Request) {
     }
 
     // =====================================================
-    // 5. VERIFY RAZORPAY SIGNATURE
+    // 6. LOCAL BID AMOUNT
     // =====================================================
 
-    const razorpaySecret =
-      process.env.RAZORPAY_KEY_SECRET;
-
-    if (!razorpaySecret) {
-      console.error(
-        "Missing RAZORPAY_KEY_SECRET."
+    const paidBidAmount =
+      Number(
+        paymentOrder.amount
       );
 
+    if (
+      !Number.isFinite(
+        paidBidAmount
+      ) ||
+      paidBidAmount < MINIMUM_BID
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid bid amount.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // =====================================================
+    // 7. RAZORPAY CONFIG
+    // =====================================================
+
+    const keyId =
+      process.env.RAZORPAY_KEY_ID;
+
+    const keySecret =
+      process.env.RAZORPAY_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
       return NextResponse.json(
         {
           success: false,
@@ -154,12 +277,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // =====================================================
+    // 8. SIGNATURE VERIFICATION
+    // =====================================================
+
     const generatedSignature =
-      crypto
-        .createHmac(
-          "sha256",
-          razorpaySecret
-        )
+      createHmac(
+        "sha256",
+        keySecret
+      )
         .update(
           `${razorpayOrderId}|${razorpayPaymentId}`
         )
@@ -169,37 +295,19 @@ export async function POST(request: Request) {
       generatedSignature !==
       razorpaySignature
     ) {
-      console.error(
-        "Bid Razorpay signature verification failed."
-      );
-
       return NextResponse.json(
         {
           success: false,
           error:
-            "Payment verification failed.",
+            "Payment signature verification failed.",
         },
         { status: 400 }
       );
     }
 
     // =====================================================
-    // 6. VERIFY RAZORPAY ORDER SERVER-SIDE
+    // 9. FETCH RAZORPAY ORDER SERVER-SIDE
     // =====================================================
-
-    const keyId =
-      process.env.RAZORPAY_KEY_ID;
-
-    if (!keyId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Razorpay server configuration is missing.",
-        },
-        { status: 500 }
-      );
-    }
 
     const razorpayOrderResponse =
       await fetch(
@@ -210,20 +318,22 @@ export async function POST(request: Request) {
             Authorization:
               "Basic " +
               Buffer.from(
-                `${keyId}:${razorpaySecret}`
+                `${keyId}:${keySecret}`
               ).toString("base64"),
           },
         }
       );
 
     const razorpayOrderData =
-      await razorpayOrderResponse.json();
+      await razorpayOrderResponse
+        .json()
+        .catch(() => null);
 
     if (
       !razorpayOrderResponse.ok
     ) {
       console.error(
-        "Bid Razorpay order lookup failed:",
+        "Razorpay order fetch failed:",
         razorpayOrderData
       );
 
@@ -238,246 +348,257 @@ export async function POST(request: Request) {
     }
 
     // =====================================================
-    // 7. VERIFY THIS IS A BID PAYMENT
+    // 10. VERIFY RAZORPAY ORDER AMOUNT
     // =====================================================
 
+    const razorpayAmount =
+      Number(
+        razorpayOrderData?.amount
+      );
+
+    const expectedAmount =
+      Math.round(
+        paidBidAmount * 100
+      );
+
     if (
-      razorpayOrderData?.notes?.payment_type !==
+      !Number.isFinite(
+        razorpayAmount
+      ) ||
+      razorpayAmount !==
+        expectedAmount
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Payment amount does not match the bid amount.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // =====================================================
+    // 11. VERIFY RAZORPAY NOTES
+    // =====================================================
+
+    const notes =
+      razorpayOrderData?.notes ??
+      {};
+
+    if (
+      notes.payment_type !==
       "bid"
     ) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "This payment order is not a valid bid payment.",
+            "This payment is not registered as a bid payment.",
         },
         { status: 400 }
       );
     }
 
     if (
-      razorpayOrderData?.notes?.listing_id !==
+      notes.listing_id !==
       paymentOrder.listing_id
     ) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Bid listing verification failed.",
+            "Payment listing mismatch.",
         },
         { status: 400 }
       );
     }
 
     if (
-      razorpayOrderData?.notes?.user_id !==
+      notes.user_id !==
       user.id
     ) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Bid user verification failed.",
+            "Payment user mismatch.",
         },
         { status: 400 }
       );
     }
 
-    const paidBidAmount =
-      Number(paymentOrder.amount);
+    // =====================================================
+    // 12. VERIFY PAYMENT STATUS WITH RAZORPAY
+    // =====================================================
 
-    const razorpayOrderAmount =
-      Number(
-        razorpayOrderData?.amount
-      ) / 100;
+    const paymentResponse =
+      await fetch(
+        `https://api.razorpay.com/v1/payments/${razorpayPaymentId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization:
+              "Basic " +
+              Buffer.from(
+                `${keyId}:${keySecret}`
+              ).toString("base64"),
+          },
+        }
+      );
+
+    const paymentData =
+      await paymentResponse
+        .json()
+        .catch(() => null);
 
     if (
-      !Number.isFinite(
-        paidBidAmount
-      ) ||
-      !Number.isFinite(
-        razorpayOrderAmount
-      ) ||
-      paidBidAmount !==
-        razorpayOrderAmount
+      !paymentResponse.ok
+    ) {
+      console.error(
+        "Razorpay payment fetch failed:",
+        paymentData
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Unable to verify the Razorpay payment.",
+        },
+        { status: 502 }
+      );
+    }
+
+    if (
+      paymentData?.order_id !==
+      razorpayOrderId
     ) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Bid payment amount verification failed.",
+            "Razorpay payment order mismatch.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      Number(
+        paymentData?.amount
+      ) !== expectedAmount
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Razorpay payment amount mismatch.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      paymentData?.status !==
+      "captured"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Payment has not been captured.",
         },
         { status: 400 }
       );
     }
 
     // =====================================================
-    // 8. MARK PAYMENT AS PAID
-    // =====================================================
-
-    if (
-      paymentOrder.status ===
-      "pending"
-    ) {
-      const {
-        data: updatedPaymentOrder,
-        error: updateError,
-      } = await supabaseAdmin
-        .from("payment_orders")
-        .update({
-          razorpay_payment_id:
-            razorpayPaymentId,
-          razorpay_signature:
-            razorpaySignature,
-          status: "paid",
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq(
-          "id",
-          paymentOrder.id
-        )
-        .eq(
-          "user_id",
-          user.id
-        )
-        .eq(
-          "status",
-          "pending"
-        )
-        .select(
-          `
-          id,
-          listing_id,
-          user_id,
-          amount,
-          currency,
-          razorpay_order_id,
-          razorpay_payment_id,
-          status
-          `
-        )
-        .maybeSingle();
-
-      if (updateError) {
-        console.error(
-          "Bid payment status update error:",
-          updateError
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Payment was verified but could not be saved.",
-          },
-          { status: 500 }
-        );
-      }
-
-      if (updatedPaymentOrder) {
-        console.log(
-          "Bid payment marked as paid:",
-          updatedPaymentOrder.id
-        );
-      }
-    }
-
-    // =====================================================
-    // 9. CHECK WHETHER THIS BID WAS ALREADY CREATED
+    // 13. MARK PAYMENT PAID
     // =====================================================
 
     const {
-      data: existingBid,
-      error: existingBidError,
+      error: paymentUpdateError,
     } = await supabaseAdmin
-      .from("bids")
-      .select(
-        "id, listing_id, bidder_id, amount, created_at"
+      .from("payment_orders")
+      .update({
+        razorpay_payment_id:
+          razorpayPaymentId,
+
+        razorpay_signature:
+          razorpaySignature,
+
+        status:
+          "paid",
+
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq(
+        "id",
+        paymentOrder.id
       )
       .eq(
-        "listing_id",
-        paymentOrder.listing_id
-      )
-      .eq(
-        "bidder_id",
+        "user_id",
         user.id
       )
       .eq(
-        "amount",
-        paidBidAmount
-      )
-      .gte(
-        "created_at",
-        paymentOrder.created_at
-      )
-      .order(
-        "created_at",
-        {
-          ascending: false,
-        }
-      )
-      .limit(1)
-      .maybeSingle();
+        "status",
+        "pending"
+      );
 
-    if (existingBidError) {
+    if (paymentUpdateError) {
       console.error(
-        "Existing bid lookup error:",
-        existingBidError
+        "Payment status update error:",
+        paymentUpdateError
       );
 
       return NextResponse.json(
         {
           success: false,
           error:
-            "Unable to verify whether the bid was already placed.",
+            "Payment was verified but could not be recorded safely.",
         },
         { status: 500 }
       );
     }
 
-    if (existingBid) {
-      return NextResponse.json({
-        success: true,
-        verified: true,
-        alreadyPlaced: true,
-        bid: existingBid,
-        message:
-          "Payment verified and bid is already live.",
-      });
-    }
-
     // =====================================================
-    // 10. PLACE BID ONLY AFTER PAYMENT VERIFICATION
+    // 14. CALL AUTHENTICATED place_bid()
+    // =====================================================
+    //
+    // IMPORTANT:
+    // Use the authenticated Supabase client.
+    // Do NOT use supabaseAdmin.rpc() here because
+    // place_bid() uses auth.uid().
     // =====================================================
 
-  const {
-  data: placedBid,
-  error: placeBidError,
-} = await supabase.rpc(
-  "place_bid",
-  {
-    p_listing_id:
-      paymentOrder.listing_id,
-    p_amount:
-      paidBidAmount,
-  }
-);
+    const {
+      data: bidResult,
+      error: bidError,
+    } = await supabase.rpc(
+      "place_bid",
+      {
+        p_listing_id:
+          paymentOrder.listing_id,
 
-    if (placeBidError) {
+        p_amount:
+          paidBidAmount,
+      }
+    );
+
+    if (bidError) {
       console.error(
-        "place_bid error:",
-        placeBidError
+        "place_bid RPC failed:",
+        bidError
       );
 
-      /*
-       * If another verification request placed the
-       * bid at the same time, check once more before
-       * reporting failure.
-       */
+      // ===================================================
+      // RECOVERY: CHECK WHETHER BID WAS ACTUALLY INSERTED
+      // ===================================================
 
       const {
-        data: retryExistingBid,
+        data: recoveredBid,
       } = await supabaseAdmin
         .from("bids")
         .select(
@@ -508,47 +629,124 @@ export async function POST(request: Request) {
         .limit(1)
         .maybeSingle();
 
-      if (retryExistingBid) {
-        return NextResponse.json({
-          success: true,
-          verified: true,
-          alreadyPlaced: true,
-          bid: retryExistingBid,
-          message:
-            "Payment verified and bid is now live.",
-        });
+      if (!recoveredBid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Payment was verified but the bid could not be completed. Please contact support with your payment details.",
+          },
+          { status: 500 }
+        );
       }
 
-      return NextResponse.json(
-        {
-          success: false,
-          verified: true,
-          error:
-            "Payment was verified but the bid could not be placed.",
-        },
-        { status: 500 }
-      );
+      const {
+        data: recoveredListing,
+      } =
+        await supabaseAdmin
+          .from("business_listings")
+          .select(
+            "current_bid"
+          )
+          .eq(
+            "id",
+            paymentOrder.listing_id
+          )
+          .maybeSingle();
+
+      return NextResponse.json({
+        success: true,
+        bid: recoveredBid,
+        newCurrentBid:
+          Number(
+            recoveredListing?.current_bid ??
+              0
+          ),
+      });
     }
 
     // =====================================================
-    // 11. SUCCESS
+    // 15. EXTRACT RESULT
     // =====================================================
 
-    const finalBid =
-      Array.isArray(placedBid)
-        ? placedBid[0]
-        : placedBid;
+    const bidObject =
+      bidResult &&
+      typeof bidResult ===
+        "object"
+        ? bidResult
+        : null;
+
+    const newCurrentBid =
+      Number(
+        bidObject?.new_current_bid ??
+          0
+      );
+
+    // =====================================================
+    // 16. GET ACTUAL BID RECORD
+    // =====================================================
+
+    const {
+      data: insertedBid,
+    } = await supabaseAdmin
+      .from("bids")
+      .select(
+        "id, listing_id, bidder_id, amount, created_at"
+      )
+      .eq(
+        "listing_id",
+        paymentOrder.listing_id
+      )
+      .eq(
+        "bidder_id",
+        user.id
+      )
+      .eq(
+        "amount",
+        paidBidAmount
+      )
+      .gte(
+        "created_at",
+        paymentOrder.created_at
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      )
+      .limit(1)
+      .maybeSingle();
+
+    // =====================================================
+    // 17. SUCCESS
+    // =====================================================
 
     return NextResponse.json({
       success: true,
-      verified: true,
-      bid: finalBid,
-      message:
-        "Payment verified successfully. Your bid is now live.",
+
+      bid:
+        insertedBid ??
+        {
+          id: null,
+          listing_id:
+            paymentOrder.listing_id,
+          bidder_id:
+            user.id,
+          amount:
+            paidBidAmount,
+          created_at:
+            new Date().toISOString(),
+        },
+
+      bidAmount:
+        paidBidAmount,
+
+      newCurrentBid,
     });
   } catch (error) {
     console.error(
-      "Bid payment verification error:",
+      "Verify bid payment error:",
       error
     );
 

@@ -20,18 +20,288 @@ type SubmitBusinessListingResult = {
   listingId?: string;
   securityStatus?: "approved";
   duplicate?: boolean;
-
-  /*
-   * Existing approved listing with unpaid payment.
-   * Frontend should resume the payment instead of
-   * creating another listing.
-   */
   resumePayment?: boolean;
   bidAmount?: number;
   businessName?: string;
 };
 
 const MINIMUM_NEW_BUSINESS_BID = 99;
+
+/*
+ * =========================================================
+ * BUSINESS CATEGORIES
+ * =========================================================
+ *
+ * IMPORTANT:
+ * This list MUST stay synchronized with the category list
+ * used in components/BusinessListingForm.tsx.
+ */
+
+const ALLOWED_CATEGORIES = [
+  "Accounting & Bookkeeping",
+  "Actuarial Services",
+  "Advertising",
+  "Aerospace & Aviation",
+  "Agriculture",
+  "Agricultural Equipment",
+  "Agricultural Products",
+  "Animal Feed",
+  "Animal Health",
+  "Antiques & Collectibles",
+  "App Development",
+  "Appliances",
+  "Architecture",
+  "Art Galleries",
+  "Arts & Crafts",
+  "Audio & Music",
+  "Audio-Visual Services",
+  "Automotive",
+  "Automotive Parts",
+  "Automotive Repair",
+  "Automotive Rental",
+  "Baby & Maternity",
+  "Bakery",
+  "Banking",
+  "Bars & Pubs",
+  "Beauty & Cosmetics",
+  "Beauty Salon",
+  "Beverage Manufacturing",
+  "Bicycle Sales & Repair",
+  "Biotechnology",
+  "Books & Publishing",
+  "Books & Stationery",
+  "Building Materials",
+  "Business Consulting",
+  "Business Process Outsourcing",
+  "Business Services",
+  "Car Dealership",
+  "Car Rental",
+  "Car Wash",
+  "Catering",
+  "Chemical Manufacturing",
+  "Childcare & Daycare",
+  "Cleaning Services",
+  "Clothing & Apparel",
+  "Cloud Computing",
+  "Coaching & Training",
+  "Coffee Shop",
+  "Commercial Real Estate",
+  "Computer Hardware",
+  "Computer Repair",
+  "Construction",
+  "Construction Equipment",
+  "Consumer Electronics",
+  "Consumer Goods",
+  "Content Creation",
+  "Contract Manufacturing",
+  "Corporate Services",
+  "Courier & Delivery",
+  "Cybersecurity",
+  "Dairy Products",
+  "Dance Studio",
+  "Data Analytics",
+  "Data Centers",
+  "Dental Care",
+  "Design Services",
+  "Digital Marketing",
+  "Digital Products",
+  "Disability Services",
+  "Disaster Recovery Services",
+  "Distribution",
+  "Document Services",
+  "E-commerce",
+  "E-commerce Marketplace",
+  "Education",
+  "Educational Technology",
+  "Electrical Services",
+  "Electrical Equipment",
+  "Electronics Manufacturing",
+  "Employment Services",
+  "Energy",
+  "Engineering",
+  "Entertainment",
+  "Environmental Services",
+  "Event Management",
+  "Event Venue",
+  "Export & Import",
+  "Fabric & Textiles",
+  "Factory & Industrial",
+  "Farming",
+  "Fashion Design",
+  "Fashion Retail",
+  "Financial Advisory",
+  "Financial Technology (FinTech)",
+  "Fine Arts",
+  "Fishery & Aquaculture",
+  "Fitness & Gym",
+  "Florist & Flower Shop",
+  "Food & Beverage",
+  "Food Manufacturing",
+  "Food Processing",
+  "Food Delivery",
+  "Food Wholesale",
+  "Footwear",
+  "Forestry & Timber",
+  "Freight & Logistics",
+  "Furniture",
+  "Furniture Manufacturing",
+  "Gaming",
+  "Garden & Landscaping",
+  "Gas & Fuel",
+  "General Retail",
+  "Gift Shop",
+  "Glass Manufacturing",
+  "Government Services",
+  "Graphic Design",
+  "Grocery Store",
+  "Hair Salon & Barber",
+  "Hardware Store",
+  "Health & Wellness",
+  "Healthcare",
+  "Healthcare Equipment",
+  "Healthcare Technology",
+  "Home Appliances",
+  "Home Decor",
+  "Home Improvement",
+  "Home Services",
+  "Home Security",
+  "Horticulture",
+  "Hostel",
+  "Hotels",
+  "Hospitality",
+  "Human Resources",
+  "Import & Export",
+  "Industrial Automation",
+  "Industrial Equipment",
+  "Industrial Manufacturing",
+  "Information Technology",
+  "Insurance",
+  "Interior Design",
+  "Internet Services",
+  "Investment Services",
+  "Jewellery & Accessories",
+  "Kids & Toys",
+  "Kitchen & Dining",
+  "Laboratory Services",
+  "Landscaping",
+  "Laundry & Dry Cleaning",
+  "Legal Services",
+  "Leisure & Recreation",
+  "Livestock",
+  "Loan & Credit Services",
+  "Local Services",
+  "Logistics",
+  "Luxury Goods",
+  "Machinery",
+  "Machine Tools",
+  "Management Consulting",
+  "Manufacturing",
+  "Marine & Shipping",
+  "Marketing",
+  "Media",
+  "Medical Devices",
+  "Medical Laboratory",
+  "Medical Supplies",
+  "Mental Wellness Services",
+  "Metals & Mining",
+  "Mobile App Development",
+  "Mobile Phones & Accessories",
+  "Mortgage Services",
+  "Motorcycle Sales & Repair",
+  "Movies & Film Production",
+  "Music Production",
+  "Music School",
+  "Mutual Funds & Asset Management",
+  "Natural Resources",
+  "News & Journalism",
+  "Nonprofit & Social Enterprise",
+  "Nursing & Elder Care",
+  "Office Supplies",
+  "Online Education",
+  "Online Services",
+  "Optical & Eyewear",
+  "Organic Products",
+  "Packaging",
+  "Paint & Coatings",
+  "Personal Care",
+  "Personal Finance",
+  "Personal Services",
+  "Pet Care",
+  "Pet Food",
+  "Pet Grooming",
+  "Pet Shop",
+  "Pharmaceuticals",
+  "Pharmacy",
+  "Photography",
+  "Physical Therapy",
+  "Printing",
+  "Private Security",
+  "Professional Services",
+  "Property Management",
+  "Public Relations",
+  "Publishing",
+  "Real Estate",
+  "Real Estate Development",
+  "Real Estate Brokerage",
+  "Real Estate Investment",
+  "Recycling",
+  "Renewable Energy",
+  "Rental Services",
+  "Repair & Maintenance",
+  "Research & Development",
+  "Restaurants",
+  "Restaurant Technology",
+  "Retail",
+  "Roadside Assistance",
+  "Robotics",
+  "Roofing",
+  "Safety Equipment",
+  "Salon & Spa",
+  "School",
+  "Scientific Services",
+  "Security Services",
+  "Senior Care",
+  "Shipping",
+  "Shopping & E-commerce",
+  "Skincare",
+  "Software Development",
+  "Software as a Service (SaaS)",
+  "Solar Energy",
+  "Sports",
+  "Sports Equipment",
+  "Sports Club",
+  "Staffing & Recruitment",
+  "Storage & Warehousing",
+  "Supermarket",
+  "Supply Chain Services",
+  "Taxi & Ride Services",
+  "Telecommunications",
+  "Telemedicine",
+  "Testing & Inspection",
+  "Theatre & Performing Arts",
+  "Tourism",
+  "Tour Operator",
+  "Trade Services",
+  "Transportation",
+  "Travel Agency",
+  "Travel Technology",
+  "Trucking",
+  "Tutoring",
+  "Utilities",
+  "Vacation Rental",
+  "Veterinary Services",
+  "Video Production",
+  "Waste Management",
+  "Water Services",
+  "Web Design & Development",
+  "Web Hosting",
+  "Wedding Services",
+  "Wholesale",
+  "Wine & Beverage Services",
+  "Wood Products",
+  "Yoga & Wellness",
+  "Other",
+];
 
 function normalizeUrl(value?: string) {
   const trimmed = value?.trim();
@@ -177,6 +447,332 @@ function getContentSecurityIssue(
   return null;
 }
 
+type WebsiteContentCheckResult = {
+  ok: boolean;
+  reason?: string;
+};
+
+function stripHtml(value: string) {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function analyzeWebsiteContent(
+  website: string
+): Promise<WebsiteContentCheckResult> {
+  const MAX_REDIRECTS = 3;
+  const MAX_HTML_BYTES = 1_000_000;
+  const TIMEOUT_MS = 8_000;
+
+  let currentUrl = website;
+  const visited = new Set<string>();
+
+  try {
+    for (
+      let redirectCount = 0;
+      redirectCount <= MAX_REDIRECTS;
+      redirectCount++
+    ) {
+      const parsedUrl = new URL(currentUrl);
+      const normalizedCurrent =
+        parsedUrl.toString();
+
+      /*
+       * =====================================================
+       * DOMAIN-LEVEL ADULT WEBSITE BLOCK
+       * =====================================================
+       *
+       * Run this BEFORE the website fetch so an adult site
+       * cannot avoid the content check by returning 403/429
+       * to our scanner.
+       */
+      const hostname = parsedUrl.hostname
+        .toLowerCase()
+        .replace(/^www\./, "");
+
+      const adultDomainPatterns = [
+        /\bporn\b/i,
+        /\bporno\b/i,
+        /\bpornography\b/i,
+        /\bpornographic\b/i,
+        /\bxxx\b/i,
+        /\bsexcam\b/i,
+        /\badultvideo\b/i,
+        /\badultvideos\b/i,
+        /\badultcontent\b/i,
+        /\bnsfw\b/i,
+        /\bsexvideo\b/i,
+        /\bsexvideos\b/i,
+        /\beroticvideo\b/i,
+        /\beroticvideos\b/i,
+      ];
+
+      if (
+        adultDomainPatterns.some(
+          (pattern) => pattern.test(hostname)
+        )
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website appears to be an adult/pornographic website and cannot be listed on OutbidInd.",
+        };
+      }
+
+      if (
+        visited.has(normalizedCurrent)
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website has an invalid redirect loop and cannot be listed on OutbidInd.",
+        };
+      }
+
+      visited.add(normalizedCurrent);
+
+      const securityResult =
+        await checkWebsiteSecurity(
+          normalizedCurrent
+        );
+
+      if (
+        securityResult.status ===
+        "concern"
+      ) {
+        return {
+          ok: false,
+          reason:
+            securityResult.reason ||
+            "This website could not pass our security checks and cannot be listed on OutbidInd.",
+        };
+      }
+
+      const controller =
+        new AbortController();
+
+      const timeout = setTimeout(
+        () => controller.abort(),
+        TIMEOUT_MS
+      );
+
+      let response: Response;
+
+      try {
+        response = await fetch(
+          normalizedCurrent,
+          {
+            method: "GET",
+            redirect: "manual",
+            signal: controller.signal,
+            headers: {
+              Accept:
+                "text/html,application/xhtml+xml",
+              "User-Agent":
+                "OutbidInd-Security-Scanner/1.0",
+            },
+            cache: "no-store",
+          }
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (
+        response.status >= 300 &&
+        response.status < 400
+      ) {
+        const location =
+          response.headers.get(
+            "location"
+          );
+
+        if (
+          !location ||
+          redirectCount ===
+            MAX_REDIRECTS
+        ) {
+          return {
+            ok: false,
+            reason:
+              "This website has too many or invalid redirects and cannot be listed on OutbidInd.",
+          };
+        }
+
+        currentUrl = new URL(
+          location,
+          normalizedCurrent
+        ).toString();
+
+        continue;
+      }
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          reason:
+            "This website could not be reached or verified. Please use a working official business website.",
+        };
+      }
+
+      const contentType =
+        response.headers.get(
+          "content-type"
+        ) || "";
+
+      if (
+        !/text\/html|application\/xhtml\+xml/i.test(
+          contentType
+        )
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website does not provide a readable business webpage and cannot be listed on OutbidInd.",
+        };
+      }
+
+      const contentLength =
+        Number(
+          response.headers.get(
+            "content-length"
+          ) || "0"
+        );
+
+      if (
+        contentLength > MAX_HTML_BYTES
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website is too large to safely analyze and cannot be listed on OutbidInd.",
+        };
+      }
+
+      const html =
+        await response.text();
+
+      if (
+        new TextEncoder()
+          .encode(html)
+          .byteLength >
+        MAX_HTML_BYTES
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website is too large to safely analyze and cannot be listed on OutbidInd.",
+        };
+      }
+
+      const title =
+        html.match(
+          /<title[^>]*>([\s\S]*?)<\/title>/i
+        )?.[1] || "";
+
+      const description =
+        html.match(
+          /<meta[^>]+(?:name|property)=["'](?:description|og:description|rating)["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i
+        )?.[1] || "";
+
+      const visibleText =
+        stripHtml(html);
+
+      const normalized =
+        normalizeText(
+          `${parsedUrl.hostname} ${title} ${description} ${visibleText}`
+        );
+
+      const strongAdultSignals = [
+        /\b(porn|pornography|pornographic|xxx|xvideos|xnxx|redtube|sexcam|webcam\s*sex|live\s*sex|sexual\s*services?)\b/i,
+        /\b(onlyfans|fansly|manyvids|chaturbate|stripchat|brazzers|pornhub)\b/i,
+        /\b(nude|nudity|explicit\s*(?:content|videos?|photos?|images?))\b/i,
+      ];
+
+      const adultMatches =
+        strongAdultSignals.filter(
+          (pattern) =>
+            pattern.test(normalized)
+        ).length;
+
+      const adultDomain =
+        /(?:porn|xxx|sexcam|adultvideo|nsfw)/i.test(
+          parsedUrl.hostname
+        );
+
+      if (
+        adultDomain ||
+        adultMatches >= 1
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website appears to be an adult/pornographic website or contain adult/pornographic content and cannot be listed on OutbidInd.",
+        };
+      }
+
+      const suspiciousSignals = [
+        /\b(phishing\s*(?:kit|page|site)|credential\s*stealer|password\s*stealer|keylogger|ransomware|malware\s*download|botnet\s*panel)\b/i,
+        /\b(stolen\s*(?:credit|debit)\s*cards?|carding\s*shop|credit\s*card\s*dumps?)\b/i,
+        /\b(cracked\s*software|warez|illegal\s*downloads?|exploit\s*kit|remote\s*access\s*trojan)\b/i,
+      ];
+
+      if (
+        suspiciousSignals.some(
+          (pattern) =>
+            pattern.test(normalized)
+        )
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website appears to contain suspicious or potentially malicious content and cannot be listed on OutbidInd.",
+        };
+      }
+
+      if (
+        /(?:deceptive\s*site|dangerous\s*site|malicious\s*site|phishing\s*warning|this\s*site\s*may\s*harm|security\s*warning)/i.test(
+          normalized
+        )
+      ) {
+        return {
+          ok: false,
+          reason:
+            "This website appears to have a security warning or suspicious content and cannot be listed on OutbidInd.",
+        };
+      }
+
+      return {
+        ok: true,
+      };
+    }
+
+    return {
+      ok: false,
+      reason:
+        "This website could not complete security analysis and cannot be listed on OutbidInd.",
+    };
+  } catch (error) {
+    console.error(
+      "Website content analysis failed:",
+      error
+    );
+
+    return {
+      ok: false,
+      reason:
+        "This website could not be safely analyzed. Please use a working official business website.",
+    };
+  }
+}
+
 export async function submitBusinessListing(
   input: SubmitBusinessListingInput
 ): Promise<SubmitBusinessListingResult> {
@@ -186,14 +782,19 @@ export async function submitBusinessListing(
    * =====================================================
    */
 
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
-  if (authError || !user) {
+  if (
+    authError ||
+    !user
+  ) {
     return {
       success: false,
       error:
@@ -208,22 +809,28 @@ export async function submitBusinessListing(
    */
 
   const businessName =
-    input.businessName?.trim() || "";
+    input.businessName?.trim() ||
+    "";
 
   const category =
-    input.category?.trim() || "";
+    input.category?.trim() ||
+    "";
 
   const description =
-    input.description?.trim() || "";
+    input.description?.trim() ||
+    "";
 
   const location =
-    input.location?.trim() || "";
+    input.location?.trim() ||
+    "";
 
   const additionalInformation =
-    input.additionalInformation?.trim() || null;
+    input.additionalInformation?.trim() ||
+    null;
 
   const rawWebsite =
-    input.website?.trim() || "";
+    input.website?.trim() ||
+    "";
 
   const website =
     normalizeUrl(rawWebsite);
@@ -240,11 +847,14 @@ export async function submitBusinessListing(
   if (!businessName) {
     return {
       success: false,
-      error: "Business name is required.",
+      error:
+        "Business name is required.",
     };
   }
 
-  if (businessName.length > 200) {
+  if (
+    businessName.length > 200
+  ) {
     return {
       success: false,
       error:
@@ -253,24 +863,22 @@ export async function submitBusinessListing(
   }
 
   /*
-   * CATEGORY
+   * CATEGORY VALIDATION
    *
-   * Categories are intentionally independent/free-text.
-   * Users can enter any legitimate business category.
+   * This now exactly matches the category
+   * values from BusinessListingForm.tsx.
    */
 
-  if (!category) {
-    return {
-      success: false,
-      error: "Business category is required.",
-    };
-  }
-
-  if (category.length > 200) {
+  if (
+    !category ||
+    !ALLOWED_CATEGORIES.includes(
+      category
+    )
+  ) {
     return {
       success: false,
       error:
-        "Business category must be 200 characters or less.",
+        "Please select a valid business category.",
     };
   }
 
@@ -282,7 +890,9 @@ export async function submitBusinessListing(
     };
   }
 
-  if (description.length > 5000) {
+  if (
+    description.length > 5000
+  ) {
     return {
       success: false,
       error:
@@ -298,7 +908,9 @@ export async function submitBusinessListing(
     };
   }
 
-  if (location.length > 300) {
+  if (
+    location.length > 300
+  ) {
     return {
       success: false,
       error:
@@ -306,7 +918,19 @@ export async function submitBusinessListing(
     };
   }
 
-  if (rawWebsite && !website) {
+  /*
+   * WEBSITE IS MANDATORY
+   */
+
+  if (!rawWebsite) {
+    return {
+      success: false,
+      error:
+        "Business website is required. Please enter your official business website.",
+    };
+  }
+
+  if (!website) {
     return {
       success: false,
       error:
@@ -314,9 +938,14 @@ export async function submitBusinessListing(
     };
   }
 
+  /*
+   * BID VALIDATION
+   */
+
   if (
     !Number.isFinite(bidAmount) ||
-    bidAmount < MINIMUM_NEW_BUSINESS_BID
+    bidAmount <
+      MINIMUM_NEW_BUSINESS_BID
   ) {
     return {
       success: false,
@@ -327,29 +956,65 @@ export async function submitBusinessListing(
 
   /*
    * =====================================================
-   * 4. CHECK USER'S EXISTING APPROVED/LIVE LISTINGS
+   * 4. WEBSITE SECURITY + CONTENT ANALYSIS
    * =====================================================
-   *
-   * This check is specifically for RESUME logic.
-   *
-   * Rejected listings are ignored.
+   */
+
+  const websiteAnalysis =
+    await analyzeWebsiteContent(
+      website
+    );
+
+  if (!websiteAnalysis.ok) {
+    console.warn(
+      "Business website blocked by content/security analysis:",
+      {
+        website,
+        reason:
+          websiteAnalysis.reason,
+      }
+    );
+
+    return {
+      success: false,
+      error:
+        websiteAnalysis.reason ||
+        "This website could not pass our security and content checks. Please use a different official business website.",
+    };
+  }
+
+  /*
+   * =====================================================
+   * 5. CHECK USER'S EXISTING LISTINGS
+   * =====================================================
    */
 
   const {
     data: existingListings,
-    error: existingListingError,
+    error:
+      existingListingError,
   } = await supabaseAdmin
-    .from("business_listings")
+    .from(
+      "business_listings"
+    )
     .select(
       "id, business_name, location, starting_bid, listing_status, ai_review_status"
     )
-    .eq("owner_id", user.id)
-    .in("listing_status", [
-      "approved",
-      "live",
-    ]);
+    .eq(
+      "owner_id",
+      user.id
+    )
+    .in(
+      "listing_status",
+      [
+        "approved",
+        "live",
+      ]
+    );
 
-  if (existingListingError) {
+  if (
+    existingListingError
+  ) {
     console.error(
       "Existing listing lookup failed:",
       existingListingError
@@ -362,53 +1027,68 @@ export async function submitBusinessListing(
     };
   }
 
-  /*
-   * Find an existing listing belonging to the same user.
-   *
-   * Business name + location are used for resume matching.
-   */
-
   const normalizedBusinessName =
-    normalizeText(businessName);
+    normalizeText(
+      businessName
+    );
 
   const normalizedLocation =
-    normalizeText(location);
+    normalizeText(
+      location
+    );
 
   const existingListing =
-    existingListings?.find((listing) => {
-      return (
-        normalizeText(
-          listing.business_name || ""
-        ) === normalizedBusinessName &&
-        normalizeText(
-          listing.location || ""
-        ) === normalizedLocation
-      );
-    });
+    existingListings?.find(
+      (listing) => {
+        return (
+          normalizeText(
+            listing.business_name ||
+              ""
+          ) ===
+            normalizedBusinessName &&
+          normalizeText(
+            listing.location ||
+              ""
+          ) ===
+            normalizedLocation
+        );
+      }
+    );
 
   if (existingListing) {
     /*
      * ===================================================
-     * 4A. CHECK WHETHER THIS LISTING IS ALREADY PAID
+     * CHECK PAID PAYMENT
      * ===================================================
      */
 
     const {
       data: paidPayment,
-      error: paidPaymentError,
+      error:
+        paidPaymentError,
     } = await supabaseAdmin
-      .from("payment_orders")
+      .from(
+        "payment_orders"
+      )
       .select("id")
       .eq(
         "listing_id",
         existingListing.id
       )
-      .eq("user_id", user.id)
-      .eq("status", "paid")
+      .eq(
+        "user_id",
+        user.id
+      )
+      .eq(
+        "status",
+        "paid"
+      )
       .limit(1)
       .maybeSingle();
 
-    if (paidPaymentError) {
+    if (
+      paidPaymentError
+    ) {
       console.error(
         "Paid payment lookup failed:",
         paidPaymentError
@@ -422,9 +1102,7 @@ export async function submitBusinessListing(
     }
 
     /*
-     * PAID LISTING
-     *
-     * User cannot create another listing.
+     * ALREADY PAID
      */
 
     if (paidPayment) {
@@ -437,35 +1115,33 @@ export async function submitBusinessListing(
     }
 
     /*
-     * ===================================================
-     * 4B. EXISTING LISTING BUT PAYMENT NOT COMPLETED
-     * ===================================================
+     * EXISTING LISTING,
+     * PAYMENT NOT COMPLETED
      *
-     * Resume the same listing.
-     *
-     * PaymentPage -> create-order API will reuse an
-     * existing pending Razorpay order if one exists.
+     * Resume payment.
      */
 
     return {
       success: true,
       resumePayment: true,
-      listingId: existingListing.id,
+      listingId:
+        existingListing.id,
       businessName:
         existingListing.business_name,
       bidAmount:
-        Number(existingListing.starting_bid) ||
+        Number(
+          existingListing.starting_bid
+        ) ||
         bidAmount,
-      securityStatus: "approved",
+      securityStatus:
+        "approved",
     };
   }
 
   /*
    * =====================================================
-   * 5. DUPLICATE CHECK
+   * 6. DUPLICATE CHECK
    * =====================================================
-   *
-   * This catches duplicates against other users/listings.
    */
 
   const {
@@ -474,14 +1150,23 @@ export async function submitBusinessListing(
   } = await supabaseAdmin.rpc(
     "check_business_duplicate",
     {
-      p_business_name: businessName,
-      p_location: location,
-      p_website: website,
-      p_owner_id: user.id,
+      p_business_name:
+        businessName,
+
+      p_location:
+        location,
+
+      p_website:
+        website,
+
+      p_owner_id:
+        user.id,
     }
   );
 
-  if (duplicateError) {
+  if (
+    duplicateError
+  ) {
     console.error(
       "Duplicate check failed:",
       duplicateError
@@ -494,7 +1179,10 @@ export async function submitBusinessListing(
     };
   }
 
-  if (duplicateResult?.duplicate === true) {
+  if (
+    duplicateResult?.duplicate ===
+    true
+  ) {
     return {
       success: false,
       duplicate: true,
@@ -505,50 +1193,8 @@ export async function submitBusinessListing(
 
   /*
    * =====================================================
-   * 6. WEBSITE SECURITY
-   * =====================================================
-   *
-   * Security concern = STOP.
-   *
-   * NO database listing is created.
-   */
-
-  if (website) {
-    const websiteResult =
-      await checkWebsiteSecurity(website);
-
-    if (
-      websiteResult.status === "concern"
-    ) {
-      console.warn(
-        "Business website blocked:",
-        {
-          domain:
-            websiteResult.domain,
-          reason:
-            websiteResult.reason,
-          threats:
-            websiteResult.threats,
-        }
-      );
-
-      return {
-        success: false,
-        error:
-          websiteResult.reason ||
-          "This website could not pass our security checks. Please use a different website.",
-      };
-    }
-  }
-
-  /*
-   * =====================================================
    * 7. CONTENT SECURITY
    * =====================================================
-   *
-   * Security concern = STOP.
-   *
-   * NO database listing is created.
    */
 
   const contentIssue =
@@ -564,7 +1210,8 @@ export async function submitBusinessListing(
       "Business content blocked:",
       {
         businessName,
-        reason: contentIssue,
+        reason:
+          contentIssue,
       }
     );
 
@@ -576,50 +1223,74 @@ export async function submitBusinessListing(
 
   /*
    * =====================================================
-   * 8. ALL CHECKS PASSED
+   * 8. CREATE NEW LISTING
    * =====================================================
    *
-   * Create a completely new listing.
+   * Security passed.
    *
-   * IMPORTANT:
    * approved != live
    *
-   * Payment still needs to be completed.
+   * Payment is still required.
    */
 
   const {
     data: listing,
     error: insertError,
-  } = await supabaseAdmin
-    .from("business_listings")
-    .insert({
-      owner_id: user.id,
-      business_name: businessName,
-      category,
-      description,
-      location,
-      starting_bid: bidAmount,
-      current_bid: bidAmount,
-      business_website: website,
-      additional_information:
-        additionalInformation,
+  } =
+    await supabaseAdmin
+      .from(
+        "business_listings"
+      )
+      .insert({
+        owner_id:
+          user.id,
 
-      listing_status: "approved",
-      ai_review_status: "approved",
-    })
-    .select("id")
-    .single();
+        business_name:
+          businessName,
 
-  if (insertError || !listing) {
+        category,
+
+        description,
+
+        location,
+
+        starting_bid:
+          bidAmount,
+
+        current_bid:
+          bidAmount,
+
+        business_website:
+          website,
+
+        additional_information:
+          additionalInformation,
+
+        listing_status:
+          "approved",
+
+        ai_review_status:
+          "approved",
+      })
+      .select("id")
+      .single();
+
+  if (
+    insertError ||
+    !listing
+  ) {
     console.error(
       "Business listing insertion failed:",
       {
         message:
           insertError?.message,
+
         details:
           insertError?.details,
+
         hint:
           insertError?.hint,
+
         code:
           insertError?.code,
       }
@@ -641,10 +1312,18 @@ export async function submitBusinessListing(
 
   return {
     success: true,
-    listingId: listing.id,
-    securityStatus: "approved",
-    resumePayment: false,
+
+    listingId:
+      listing.id,
+
+    securityStatus:
+      "approved",
+
+    resumePayment:
+      false,
+
     businessName,
+
     bidAmount,
   };
 }

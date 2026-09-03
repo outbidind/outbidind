@@ -6,7 +6,9 @@ import {
   useEffect,
   useState,
 } from "react";
+
 import { useRouter } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/client";
 
 type Bid = {
@@ -21,7 +23,9 @@ type RealtimeBusinessContextValue = {
 };
 
 const RealtimeBusinessContext =
-  createContext<RealtimeBusinessContextValue | null>(null);
+  createContext<RealtimeBusinessContextValue | null>(
+    null
+  );
 
 type RealtimeBusinessProps = {
   listingId: string;
@@ -48,7 +52,13 @@ export default function RealtimeBusiness({
     const supabase = createClient();
 
     const channel = supabase
-      .channel(`business-${listingId}`)
+      .channel(
+        `business-${listingId}`
+      )
+
+      // ===================================================
+      // BUSINESS LISTING UPDATE
+      // ===================================================
 
       .on(
         "postgres_changes",
@@ -59,29 +69,49 @@ export default function RealtimeBusiness({
           filter: `id=eq.${listingId}`,
         },
         (payload) => {
-          const updated = payload.new as {
-            current_bid?: number | string;
-            listing_status?: string;
-          };
+          const updated =
+            payload.new as {
+              current_bid?:
+                | number
+                | string;
 
-          const newCurrentBid = Number(
-            updated.current_bid ?? 0
+              listing_status?:
+                | string;
+            };
+
+          const newCurrentBid =
+            Number(
+              updated.current_bid ??
+                0
+            );
+
+          // IMPORTANT:
+          // current_bid is now the accumulated
+          // auction total.
+
+          setCurrentBid(
+            newCurrentBid
           );
 
-          setCurrentBid(newCurrentBid);
-
           /*
-           * Payment verification changes:
+           * Refresh server-rendered page.
            *
-           * approved → live
+           * This keeps:
+           * - payment UI
+           * - listing status
+           * - bid history
+           * - auction data
            *
-           * Refresh the Next.js Server Component so the
-           * pending payment UI changes to the LIVE auction
-           * automatically without a browser reload.
+           * synchronized.
            */
+
           router.refresh();
         }
       )
+
+      // ===================================================
+      // NEW BID INSERT
+      // ===================================================
 
       .on(
         "postgres_changes",
@@ -92,32 +122,60 @@ export default function RealtimeBusiness({
           filter: `listing_id=eq.${listingId}`,
         },
         (payload) => {
-          const newBid = payload.new as {
-            id: string;
-            listing_id: string;
-            amount: number | string;
-            created_at: string;
-          };
+          const newBid =
+            payload.new as {
+              id: string;
+              listing_id: string;
+              amount:
+                | number
+                | string;
+              created_at: string;
+            };
 
           const bid: Bid = {
             id: newBid.id,
-            amount: Number(newBid.amount),
-            created_at: newBid.created_at,
+
+            amount:
+              Number(
+                newBid.amount
+              ),
+
+            created_at:
+              newBid.created_at,
           };
 
-          setBids((existing) => {
-            if (
-              existing.some(
-                (item) => item.id === bid.id
-              )
-            ) {
-              return existing;
+          setBids(
+            (existing) => {
+              if (
+                existing.some(
+                  (item) =>
+                    item.id ===
+                    bid.id
+                )
+              ) {
+                return existing;
+              }
+
+              return [
+                bid,
+                ...existing,
+              ].slice(0, 20);
             }
+          );
 
-            return [bid, ...existing].slice(0, 20);
-          });
+          /*
+           * DO NOT:
+           *
+           * setCurrentBid(bid.amount)
+           *
+           * because bid.amount is only the
+           * latest contribution.
+           *
+           * The accumulated total comes from
+           * business_listings.current_bid.
+           */
 
-          setCurrentBid(bid.amount);
+          router.refresh();
         }
       )
 
@@ -129,9 +187,14 @@ export default function RealtimeBusiness({
       });
 
     return () => {
-      void supabase.removeChannel(channel);
+      void supabase.removeChannel(
+        channel
+      );
     };
-  }, [listingId, router]);
+  }, [
+    listingId,
+    router,
+  ]);
 
   return (
     <RealtimeBusinessContext.Provider
@@ -146,9 +209,10 @@ export default function RealtimeBusiness({
 }
 
 export function useRealtimeBusiness() {
-  const context = useContext(
-    RealtimeBusinessContext
-  );
+  const context =
+    useContext(
+      RealtimeBusinessContext
+    );
 
   if (!context) {
     throw new Error(

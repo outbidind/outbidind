@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
+
 import BidSection from "@/components/BidSection";
-import CompletePaymentButton from "@/components/CompletePaymentButton";
 
 type PageProps = {
   params: Promise<{
@@ -39,26 +40,24 @@ type Bid = {
   created_at: string;
 };
 
-type MyBusiness = {
-  id: string;
-  business_name: string;
-  starting_bid: number | string | null;
-  listing_status: string;
-};
-
-type PaymentOrder = {
-  status: string;
-  created_at: string;
-};
-
 function formatMoney(
-  value: number | string | null | undefined
+  value:
+    | number
+    | string
+    | null
+    | undefined
 ) {
-  return `₹${Number(value ?? 0).toLocaleString("en-IN")}`;
+  return `₹${Number(
+    value ?? 0
+  ).toLocaleString("en-IN")}`;
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString("en-IN", {
+function formatDate(
+  value: string
+) {
+  return new Date(
+    value
+  ).toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -83,19 +82,23 @@ export default async function BusinessPage({
 }: PageProps) {
   const { id } = await params;
 
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
-  /* =====================================================
-     AUTH
-     ===================================================== */
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  /* =====================================================
-     PUBLIC BUSINESS LISTING
-     ===================================================== */
+  // =====================================================
+  // PUBLIC BUSINESS LISTING
+  // =====================================================
+  //
+  // IMPORTANT:
+  // Do NOT directly query business_listings here.
+  //
+  // Public users access business details through the
+  // secure get_public_business_listing() RPC.
+  //
+  // This keeps internal fields such as owner_id,
+  // admin review fields, AI review fields, etc. away
+  // from the public page.
+  // =====================================================
 
   const {
     data: listingData,
@@ -116,6 +119,14 @@ export default async function BusinessPage({
     notFound();
   }
 
+  // =====================================================
+  // NORMALIZE RPC RESULT
+  // =====================================================
+  //
+  // Supabase RPC returning TABLE normally gives an array.
+  // We safely take the first row.
+  // =====================================================
+
   const listingRows =
     (listingData ?? []) as PublicBusinessListing[];
 
@@ -128,116 +139,15 @@ export default async function BusinessPage({
     notFound();
   }
 
-  /* =====================================================
-     OWNER CHECK
-     ===================================================== */
-
-  let isOwner = false;
-  let ownerBusiness: MyBusiness | null = null;
-
-  if (user) {
-    const {
-      data: myBusinessesData,
-      error: myBusinessesError,
-    } = await supabase.rpc(
-      "get_my_business_listings"
-    );
-
-    if (myBusinessesError) {
-      console.error(
-        "Failed to load owner's businesses:",
-        myBusinessesError
-      );
-    }
-
-    const myBusinesses =
-      (myBusinessesData ?? []) as MyBusiness[];
-
-    ownerBusiness =
-      myBusinesses.find(
-        (business) =>
-          business.id === listing.id
-      ) ?? null;
-
-    isOwner = Boolean(ownerBusiness);
-  }
-
-  /* =====================================================
-     PAYMENT STATUS
-     
-     Only owner can read their payment order.
-     ===================================================== */
-
-  let latestPayment: PaymentOrder | null =
-    null;
-
-  if (isOwner && user) {
-    const {
-      data: paymentData,
-      error: paymentError,
-    } = await supabase
-      .from("payment_orders")
-      .select(
-        "status, created_at"
-      )
-      .eq("listing_id", listing.id)
-      .eq("user_id", user.id)
-      .order("created_at", {
-        ascending: false,
-      })
-      .limit(1)
-      .maybeSingle();
-
-    if (paymentError) {
-      console.error(
-        "Failed to load payment status:",
-        paymentError
-      );
-    }
-
-    if (paymentData) {
-      latestPayment =
-        paymentData as PaymentOrder;
-    }
-  }
-
-  /* =====================================================
-     LISTING STATE
-     
-     Internal:
-       approved = waiting for payment
-       live = payment completed
-     
-     User-facing:
-       approved/unpaid = Pending
-       live = Live
-     ===================================================== */
-
-  const isLive =
-    listing.listing_status ===
-    "live";
-
-  const isPaymentPending =
-    listing.listing_status ===
-      "approved" &&
-    latestPayment?.status !==
-      "paid";
-
-  /* =====================================================
-     OWNER PAYMENT ACTION
-     
-     Only owner can complete payment.
-     
-     No payment order is also considered pending.
-     ===================================================== */
-
-  const canCompletePayment =
-    isOwner &&
-    isPaymentPending;
-
-  /* =====================================================
-     PUBLIC BID HISTORY
-     ===================================================== */
+  // =====================================================
+  // PUBLIC BID HISTORY
+  // =====================================================
+  //
+  // We use the secure RPC instead of directly querying
+  // the bids table.
+  //
+  // bidder_id is intentionally not returned publicly.
+  // =====================================================
 
   const {
     data: bidsData,
@@ -269,31 +179,50 @@ export default async function BusinessPage({
       })
     );
 
-  /* =====================================================
-     CURRENT BID
-     ===================================================== */
+  // =====================================================
+  // AUCTION TOTAL
+  // =====================================================
 
-  const initialCurrentBid = Number(
-    listing.current_bid ??
-      listing.starting_bid ??
-      0
-  );
+  const initialCurrentBid =
+    Number(
+      listing.current_bid ??
+        listing.starting_bid ??
+        0
+    );
 
-  /* =====================================================
-     WEBSITE
-     ===================================================== */
+  // =====================================================
+  // WEBSITE
+  // =====================================================
 
-  const website = listing.business_website
-    ? listing.business_website.startsWith(
-        "http"
-      )
-      ? listing.business_website
-      : `https://${listing.business_website}`
-    : null;
+  const website =
+    listing.business_website
+      ? listing.business_website.startsWith(
+          "http"
+        )
+        ? listing.business_website
+        : `https://${listing.business_website}`
+      : null;
 
-  /* =====================================================
-     PAGE
-     ===================================================== */
+  // =====================================================
+  // MINIMIZED BID HISTORY
+  // =====================================================
+
+  const visibleBidCount = 3;
+
+  const visibleBids =
+    bidHistory.slice(
+      0,
+      visibleBidCount
+    );
+
+  const remainingBids =
+    bidHistory.slice(
+      visibleBidCount
+    );
+
+  // =====================================================
+  // PAGE
+  // =====================================================
 
   return (
     <main className="min-h-screen bg-[#f6f7f5] text-slate-900">
@@ -321,7 +250,6 @@ export default async function BusinessPage({
           </Link>
 
           <div className="flex items-center gap-3">
-
             <Link
               href="/live-bids"
               className="hidden rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 sm:block"
@@ -335,7 +263,6 @@ export default async function BusinessPage({
             >
               Marketplace
             </Link>
-
           </div>
         </nav>
       </header>
@@ -345,9 +272,7 @@ export default async function BusinessPage({
           ================================================= */}
 
       <div className="mx-auto max-w-7xl px-5 pt-8 sm:px-8">
-
         <div className="flex items-center gap-2 text-sm text-slate-500">
-
           <Link
             href="/"
             className="transition hover:text-[#e4572e]"
@@ -360,9 +285,7 @@ export default async function BusinessPage({
           <span className="truncate text-slate-700">
             {listing.business_name}
           </span>
-
         </div>
-
       </div>
 
       {/* =================================================
@@ -403,23 +326,17 @@ export default async function BusinessPage({
                       {listing.category}
                     </span>
 
-                    {isLive ? (
+                    {listing.listing_status ===
+                    "live" ? (
                       <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
-
                         LIVE AUCTION
-
                       </span>
-                    ) : isPaymentPending ? (
-                      <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
-
-                        <span className="h-2 w-2 rounded-full bg-amber-500" />
-
-                        PAYMENT PENDING
-
+                    ) : (
+                      <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                        APPROVED
                       </span>
-                    ) : null}
+                    )}
 
                   </div>
 
@@ -428,17 +345,14 @@ export default async function BusinessPage({
                   </h1>
 
                   <p className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-600">
-
                     <span aria-hidden="true">
                       📍
                     </span>
 
                     {listing.location}
-
                   </p>
 
                 </div>
-
               </div>
 
               {/* BUSINESS INFORMATION */}
@@ -446,7 +360,6 @@ export default async function BusinessPage({
               <div className="p-7 sm:p-10">
 
                 <div>
-
                   <p className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
                     About the business
                   </p>
@@ -454,7 +367,6 @@ export default async function BusinessPage({
                   <p className="mt-4 whitespace-pre-line text-base leading-8 text-slate-600">
                     {listing.description}
                   </p>
-
                 </div>
 
                 {listing.additional_information && (
@@ -465,7 +377,9 @@ export default async function BusinessPage({
                     </p>
 
                     <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">
-                      {listing.additional_information}
+                      {
+                        listing.additional_information
+                      }
                     </p>
 
                   </div>
@@ -485,38 +399,14 @@ export default async function BusinessPage({
                       className="mt-3 inline-flex items-center gap-2 font-bold text-[#e4572e] transition hover:text-[#102a43]"
                     >
                       Visit Business Website
-
                       <Arrow />
-
                     </a>
 
                   </div>
                 )}
 
               </div>
-
             </div>
-
-            {/* =================================================
-                OWNER PAYMENT
-                ================================================= */}
-
-            {canCompletePayment && (
-              <div className="mt-8">
-
-                <CompletePaymentButton
-                  listingId={listing.id}
-                  businessName={
-                    listing.business_name
-                  }
-                  bidAmount={Number(
-                    ownerBusiness?.starting_bid ??
-                      listing.starting_bid
-                  )}
-                />
-
-              </div>
-            )}
 
             {/* =================================================
                 BID HISTORY
@@ -527,7 +417,6 @@ export default async function BusinessPage({
               <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5 sm:px-7">
 
                 <div>
-
                   <p className="font-bold text-slate-950">
                     Bid History
                   </p>
@@ -538,23 +427,20 @@ export default async function BusinessPage({
                       ? "bid"
                       : "bids"}
                   </p>
-
                 </div>
 
-                {isLive && (
+                {listing.listing_status ===
+                  "live" && (
                   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
-
                     LIVE
-
                   </span>
                 )}
 
               </div>
 
-              {bidHistory.length === 0 ? (
-
+              {bidHistory.length ===
+              0 ? (
                 <div className="px-6 py-12 text-center sm:px-7">
 
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl">
@@ -566,92 +452,168 @@ export default async function BusinessPage({
                   </p>
 
                   <p className="mt-2 text-sm text-slate-500">
-                    {isLive
-                      ? "Be the first person to place a bid on this business."
-                      : "Bidding will become available when this auction goes live."}
+                    Be the first person to
+                    place a bid on this
+                    business.
                   </p>
 
                 </div>
-
               ) : (
+                <>
 
-                <div className="divide-y divide-slate-100">
+                  {/* LATEST 3 */}
 
-                  {bidHistory.map(
-                    (bid, index) => (
-                      <div
-                        key={bid.id}
-                        className="flex items-center justify-between gap-4 px-6 py-5 sm:px-7"
-                      >
+                  <div className="divide-y divide-slate-100">
 
-                        <div className="flex min-w-0 items-center gap-4">
+                    {visibleBids.map(
+                      (
+                        bid,
+                        index
+                      ) => (
+                        <div
+                          key={bid.id}
+                          className="flex items-center justify-between gap-4 px-6 py-5 sm:px-7"
+                        >
 
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-600">
-                            #{bidHistory.length -
-                              index}
+                          <div className="flex min-w-0 items-center gap-4">
+
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-600">
+                              #
+                              {bidHistory.length -
+                                index}
+                            </div>
+
+                            <div className="min-w-0">
+
+                              <p className="font-bold text-slate-950">
+                                {formatMoney(
+                                  bid.amount
+                                )}
+                              </p>
+
+                              <p className="mt-1 text-xs text-slate-400">
+                                {formatDate(
+                                  bid.created_at
+                                )}
+                              </p>
+
+                            </div>
                           </div>
 
-                          <div className="min-w-0">
-
-                            <p className="font-bold text-slate-950">
-                              {formatMoney(
-                                bid.amount
-                              )}
-                            </p>
-
-                            <p className="mt-1 text-xs text-slate-400">
-                              {formatDate(
-                                bid.created_at
-                              )}
-                            </p>
-
-                          </div>
+                          {index === 0 && (
+                            <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#d94d28]">
+                              Latest
+                            </span>
+                          )}
 
                         </div>
+                      )
+                    )}
 
-                        {index === 0 && (
-                          <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#d94d28]">
-                            Latest
-                          </span>
+                  </div>
+
+                  {/* FULL HISTORY */}
+
+                  {remainingBids.length >
+                    0 && (
+                    <details className="border-t border-slate-100">
+
+                      <summary className="cursor-pointer list-none px-6 py-4 text-center text-sm font-bold text-[#e4572e] transition hover:bg-orange-50 sm:px-7">
+                        <span>
+                          View Full Bid History
+                        </span>
+
+                        <span className="ml-2 text-xs font-semibold text-slate-400">
+                          +
+                          {
+                            remainingBids.length
+                          }{" "}
+                          more
+                        </span>
+                      </summary>
+
+                      <div className="divide-y divide-slate-100 border-t border-slate-100">
+
+                        {remainingBids.map(
+                          (
+                            bid,
+                            remainingIndex
+                          ) => {
+                            const actualIndex =
+                              visibleBidCount +
+                              remainingIndex;
+
+                            return (
+                              <div
+                                key={bid.id}
+                                className="flex items-center justify-between gap-4 px-6 py-5 sm:px-7"
+                              >
+
+                                <div className="flex min-w-0 items-center gap-4">
+
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-600">
+                                    #
+                                    {bidHistory.length -
+                                      actualIndex}
+                                  </div>
+
+                                  <div className="min-w-0">
+
+                                    <p className="font-bold text-slate-950">
+                                      {formatMoney(
+                                        bid.amount
+                                      )}
+                                    </p>
+
+                                    <p className="mt-1 text-xs text-slate-400">
+                                      {formatDate(
+                                        bid.created_at
+                                      )}
+                                    </p>
+
+                                  </div>
+
+                                </div>
+
+                              </div>
+                            );
+                          }
                         )}
 
                       </div>
-                    )
+
+                    </details>
                   )}
 
-                </div>
-
+                </>
               )}
 
             </div>
-
           </div>
 
           {/* =================================================
-              RIGHT COLUMN
+              RIGHT / AUCTION PANEL
               ================================================= */}
 
           <aside>
 
             <div className="sticky top-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
 
-              {/* CURRENT BID */}
+              {/* AUCTION TOTAL */}
 
               <div className="bg-[#102a43] p-7 text-white sm:p-8">
 
                 <div className="flex items-center justify-between gap-4">
 
                   <p className="text-sm font-semibold text-slate-300">
-                    Current bid
+                    Auction total
                   </p>
 
-                  {isLive && (
+                  {listing.listing_status ===
+                    "live" && (
                     <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1.5 text-xs font-bold text-emerald-300">
-
                       <span className="h-2 w-2 rounded-full bg-emerald-400" />
-
                       LIVE
-
                     </span>
                   )}
 
@@ -661,6 +623,11 @@ export default async function BusinessPage({
                   {formatMoney(
                     initialCurrentBid
                   )}
+                </p>
+
+                <p className="mt-2 text-xs leading-5 text-slate-400">
+                  Every successful bid payment
+                  is added to this total.
                 </p>
 
                 <div className="mt-7 h-2 overflow-hidden rounded-full bg-white/10">
@@ -703,68 +670,27 @@ export default async function BusinessPage({
 
               </div>
 
-              {/* =================================================
-                  BID / PAYMENT AREA
-                  ================================================= */}
+              {/* BID FORM */}
 
               <div className="p-7 sm:p-8">
 
-                {isLive ? (
-                  <BidSection
-                    listingId={listing.id}
-                    currentBid={
-                      initialCurrentBid
-                    }
-                    listingStatus={
-                      listing.listing_status
-                    }
-                  />
-                ) : canCompletePayment ? (
-
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-
-                    <p className="text-sm font-bold text-amber-800">
-                      Payment required
-                    </p>
-
-                    <p className="mt-2 text-sm leading-6 text-amber-700">
-                      Complete the payment above to
-                      start this auction.
-                    </p>
-
-                    <p className="mt-4 text-lg font-black text-amber-900">
-                      {formatMoney(
-                        ownerBusiness?.starting_bid ??
-                          listing.starting_bid
-                      )}
-                    </p>
-
-                  </div>
-
-                ) : (
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-
-                    <p className="text-sm font-bold text-slate-800">
-                      Auction not live yet
-                    </p>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Bidding will become available once
-                      this business goes live.
-                    </p>
-
-                  </div>
-
-                )}
+                <BidSection
+                  listingId={
+                    listing.id
+                  }
+                  currentBid={
+                    initialCurrentBid
+                  }
+                  listingStatus={
+                    listing.listing_status
+                  }
+                />
 
               </div>
 
             </div>
 
-            {/* =================================================
-                AUCTION INFORMATION
-                ================================================= */}
+            {/* AUCTION INFORMATION */}
 
             <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6">
 
@@ -791,13 +717,25 @@ export default async function BusinessPage({
                 <div className="flex items-center justify-between gap-4">
 
                   <span className="text-sm text-slate-500">
-                    Current bid
+                    Auction total
                   </span>
 
                   <span className="text-sm font-bold text-slate-900">
                     {formatMoney(
                       initialCurrentBid
                     )}
+                  </span>
+
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+
+                  <span className="text-sm text-slate-500">
+                    Minimum bid
+                  </span>
+
+                  <span className="text-sm font-bold text-slate-900">
+                    ₹99
                   </span>
 
                 </div>
@@ -822,14 +760,16 @@ export default async function BusinessPage({
 
                   <span
                     className={
-                      isLive
+                      listing.listing_status ===
+                      "live"
                         ? "text-sm font-bold text-emerald-700"
                         : "text-sm font-bold text-amber-700"
                     }
                   >
-                    {isLive
+                    {listing.listing_status ===
+                    "live"
                       ? "Live"
-                      : "Pending"}
+                      : "Approved"}
                   </span>
 
                 </div>
@@ -841,7 +781,6 @@ export default async function BusinessPage({
           </aside>
 
         </div>
-
       </section>
 
       {/* =================================================
