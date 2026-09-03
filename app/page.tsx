@@ -813,7 +813,7 @@ export default function Home() {
                           />
 
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-700 transition hover:text-[#d94d28]">
+                            <p className="break-words text-sm font-semibold text-slate-700 transition hover:text-[#d94d28]">
                               {business.business_name}
                             </p>
 
@@ -1002,7 +1002,8 @@ export default function Home() {
 
               <>
 
-                <div className="overflow-x-auto">
+                {/* Desktop table */}
+                <div className="hidden overflow-x-auto sm:block">
 
                   <table className="w-full min-w-[760px] text-left">
 
@@ -1089,7 +1090,7 @@ export default function Home() {
                                   />
 
                                   <div className="min-w-0">
-                                    <p className="truncate font-bold text-slate-950 transition hover:text-[#d94d28]">
+                                    <p className="break-words font-bold text-slate-950 transition hover:text-[#d94d28]">
                                       {business.business_name}
                                     </p>
 
@@ -1155,6 +1156,131 @@ export default function Home() {
                     </tbody>
 
                   </table>
+
+                </div>
+
+                {/* Mobile cards */}
+                <div className="space-y-4 p-4 sm:hidden">
+
+                  {visibleLiveBids.map(
+                    (business) => {
+
+                      const globalRank =
+                        liveBids.findIndex(
+                          (item) =>
+                            item.id === business.id
+                        ) + 1;
+
+                      const website = getWebsiteUrl(
+                        business.business_website
+                      );
+
+                      return (
+
+                        <article
+                          key={business.id}
+                          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+                        >
+
+                          <div className="p-4">
+
+                            <div className="flex items-start gap-3">
+
+                              <a
+                                href={`/business/${business.id}`}
+                                onClick={() =>
+                                  trackBusinessClick(
+                                    business.id,
+                                    "detail"
+                                  )
+                                }
+                                className="flex min-w-0 flex-1 items-start gap-3"
+                              >
+
+                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#102a43] text-sm font-black text-white">
+                                  #{globalRank}
+                                </span>
+
+                                <BusinessLogo
+                                  businessName={business.business_name}
+                                  website={business.business_website}
+                                />
+
+                                <div className="min-w-0 pt-0.5">
+                                  <p className="break-words text-[17px] font-black leading-6 text-slate-950">
+                                    {business.business_name}
+                                  </p>
+
+                                  <p className="mt-1 break-words text-sm leading-5 text-slate-500">
+                                    {business.location ??
+                                      "Location not provided"}
+                                  </p>
+                                </div>
+
+                              </a>
+
+                              <div className="shrink-0 text-right">
+
+                                <p className="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">
+                                  Current
+                                </p>
+
+                                <p className="mt-1 text-2xl font-black leading-none text-slate-950">
+                                  ₹
+                                  {Number(
+                                    business.current_bid ?? 0
+                                  ).toLocaleString("en-IN")}
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                            <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+
+                              <p className="min-w-0 break-words text-sm font-bold text-slate-500">
+                                {business.category ??
+                                  "Uncategorized"}
+                              </p>
+
+                              <span className="shrink-0 rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700">
+                                LIVE
+                              </span>
+
+                            </div>
+
+                          </div>
+
+                          <div className="border-t border-slate-100 px-4 py-4">
+
+                            {website ? (
+                              <a
+                                href={website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() =>
+                                  trackBusinessClick(
+                                    business.id,
+                                    "website"
+                                  )
+                                }
+                                className="inline-flex items-center gap-2 text-base font-black text-[#d94d28] transition hover:text-[#102a43]"
+                              >
+                                Visit official website <Arrow />
+                              </a>
+                            ) : (
+                              <span className="text-sm font-semibold text-slate-400">
+                                Website unavailable
+                              </span>
+                            )}
+
+                          </div>
+
+                        </article>
+
+                      );
+                    }
+                  )}
 
                 </div>
 
