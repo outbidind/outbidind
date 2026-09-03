@@ -80,9 +80,6 @@ export default async function UserPanelPage({
 
   /* =====================================================
      MY PAYMENT ORDERS
-     
-     We only need payment information for the current
-     user's own listings.
      ===================================================== */
 
   const {
@@ -121,10 +118,6 @@ export default async function UserPanelPage({
 
   /* =====================================================
      PAYMENT PENDING LISTINGS
-     
-     Important:
-     listing_status remains "approved".
-     "Pending" here means payment is incomplete.
      ===================================================== */
 
   const isPaymentPending = (
@@ -143,6 +136,20 @@ export default async function UserPanelPage({
       );
 
     return payment?.status === "pending";
+  };
+
+  /* =====================================================
+     PENDING BUSINESS
+     ===================================================== */
+
+  const isPendingBusiness = (
+    business: Business
+  ) => {
+    return (
+      business.listing_status ===
+        "pending_review" ||
+      isPaymentPending(business)
+    );
   };
 
   /* =====================================================
@@ -167,12 +174,8 @@ export default async function UserPanelPage({
             statusFilter ===
             "pending"
           ) {
-            return (
-              business.listing_status ===
-                "pending_review" ||
-              isPaymentPending(
-                business
-              )
+            return isPendingBusiness(
+              business
             );
           }
 
@@ -203,9 +206,7 @@ export default async function UserPanelPage({
   const pendingCount =
     businesses.filter(
       (business) =>
-        business.listing_status ===
-          "pending_review" ||
-        isPaymentPending(
+        isPendingBusiness(
           business
         )
     ).length;
@@ -302,8 +303,6 @@ export default async function UserPanelPage({
       <header className="relative z-50 border-b border-slate-200 bg-white">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
 
-          {/* LOGO */}
-
           <Link
             href="/"
             className="flex items-center gap-3"
@@ -316,8 +315,6 @@ export default async function UserPanelPage({
               OutbidInd
             </span>
           </Link>
-
-          {/* DESKTOP NAVIGATION */}
 
           <div className="hidden items-center gap-3 sm:flex">
 
@@ -337,8 +334,6 @@ export default async function UserPanelPage({
 
           </div>
 
-          {/* MOBILE MENU */}
-
           <PanelMobileMenu />
 
         </nav>
@@ -350,9 +345,7 @@ export default async function UserPanelPage({
 
       <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
 
-        {/* =================================================
-            TITLE
-            ================================================= */}
+        {/* TITLE */}
 
         <div className="mb-10">
 
@@ -374,9 +367,7 @@ export default async function UserPanelPage({
 
         </div>
 
-        {/* =================================================
-            ERRORS
-            ================================================= */}
+        {/* ERRORS */}
 
         {(businessesError ||
           bidsError ||
@@ -387,9 +378,7 @@ export default async function UserPanelPage({
           </div>
         )}
 
-        {/* =================================================
-            STATUS CARDS
-            ================================================= */}
+        {/* STATUS CARDS */}
 
         <div className="mb-10 grid gap-4 sm:grid-cols-2">
 
@@ -425,9 +414,7 @@ export default async function UserPanelPage({
 
         </div>
 
-        {/* =================================================
-            MY LISTINGS
-            ================================================= */}
+        {/* MY LISTINGS */}
 
         <section
           id="listings"
@@ -548,20 +535,37 @@ export default async function UserPanelPage({
                             business
                           );
 
+                        const pendingBusiness =
+                          isPendingBusiness(
+                            business
+                          );
+
                         return (
 
                           <tr
                             key={business.id}
-                            className={`transition ${
-                              paymentPending
+                            className={`relative transition ${
+                              pendingBusiness
                                 ? "bg-amber-50/40 hover:bg-amber-50"
                                 : "hover:bg-slate-50"
                             }`}
                           >
 
+                            {/* =================================================
+                                FULL ROW LINK FOR PENDING BUSINESSES
+                                ================================================= */}
+
+                            {pendingBusiness && (
+                              <Link
+                                href={`/business/${business.id}`}
+                                aria-label={`Open ${business.business_name}`}
+                                className="absolute inset-0 z-0"
+                              />
+                            )}
+
                             {/* BUSINESS */}
 
-                            <td className="px-5 py-5">
+                            <td className="relative z-10 px-5 py-5">
 
                               <Link
                                 href={`/business/${business.id}`}
@@ -586,7 +590,7 @@ export default async function UserPanelPage({
 
                             {/* STATUS */}
 
-                            <td className="px-5 py-5">
+                            <td className="relative z-10 px-5 py-5">
 
                               <span
                                 className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClass(
@@ -614,7 +618,7 @@ export default async function UserPanelPage({
 
                             {/* STARTING BID */}
 
-                            <td className="px-5 py-5 text-sm font-semibold">
+                            <td className="relative z-10 px-5 py-5 text-sm font-semibold">
                               {formatMoney(
                                 business.starting_bid
                               )}
@@ -622,7 +626,7 @@ export default async function UserPanelPage({
 
                             {/* CURRENT BID */}
 
-                            <td className="px-5 py-5 text-sm font-black">
+                            <td className="relative z-10 px-5 py-5 text-sm font-black">
                               {formatMoney(
                                 business.current_bid
                               )}
@@ -630,7 +634,7 @@ export default async function UserPanelPage({
 
                             {/* ACTION */}
 
-                            <td className="px-5 py-5">
+                            <td className="relative z-10 px-5 py-5">
 
                               <div className="space-y-3">
 
@@ -688,9 +692,7 @@ export default async function UserPanelPage({
 
         </section>
 
-        {/* =================================================
-            MY BIDS
-            ================================================= */}
+        {/* MY BIDS */}
 
         <section>
 

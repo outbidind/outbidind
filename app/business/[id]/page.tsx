@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import BidSection from "@/components/BidSection";
+import CompletePaymentButton from "@/components/CompletePaymentButton";
 
 type PageProps = {
   params: Promise<{
@@ -35,6 +36,17 @@ type Bid = {
   id: string;
   listing_id: string;
   amount: number;
+  created_at: string;
+};
+
+type OwnerListing = {
+  owner_id: string;
+  starting_bid: number | string;
+  business_name: string;
+};
+
+type PaymentOrder = {
+  status: string;
   created_at: string;
 };
 
@@ -74,23 +86,24 @@ export default async function BusinessPage({
 
   /*
    * =====================================================
-   * PUBLIC BUSINESS LISTING
+   * AUTHENTICATED USER
    * =====================================================
    *
-   * IMPORTANT:
-   * We do NOT directly query business_listings here.
+   * We only use this to determine whether the current
+   * visitor owns this listing.
    *
-   * Public users access the listing through the secure
-   * get_public_business_listing() RPC.
-   *
-   * This prevents internal fields such as:
-   * - owner_id
-   * - ai_review_status
-   * - admin_reviewed_by
-   * - admin_reviewed_at
-   * - rejection_reason
-   *
-   * from being exposed publicly.
+   * The public listing RPC remains responsible for the
+   * public business data.
+   */
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  /*
+   * =====================================================
+   * PUBLIC BUSINESS LISTING
+   * =====================================================
    */
 
   const {
@@ -112,17 +125,6 @@ export default async function BusinessPage({
     notFound();
   }
 
-  /*
-   * =====================================================
-   * RPC RETURNS TABLE
-   *
-   * Supabase may return the row directly or as an array
-   * depending on the generated client/type information.
-   *
-   * Normalize it safely here.
-   * =====================================================
-   */
-
   const listingRows =
     (listingData ?? []) as PublicBusinessListing[];
 
@@ -137,12 +139,106 @@ export default async function BusinessPage({
 
   /*
    * =====================================================
-   * PUBLIC BID HISTORY
+   * OWNER PAYMENT STATE
    * =====================================================
    *
-   * We use the secure RPC.
+   * IMPORTANT:
+   * We do NOT expose owner_id through the public RPC.
    *
-   * bidder_id is intentionally NOT returned.
+   * This direct query is restricted to the currently
+   * authenticated user's own listing.
+   *
+   * Therefore the payment button is owner-only.
+   */
+
+  let isOwner = false;
+  let ownerListing: OwnerListing | null = null;
+  let latestPayment: PaymentOrder | null = null;
+
+  if (user) {
+    const {
+      data: ownerListingData,
+      error: ownerListingError,
+    } = await supabase
+      .from("business_listings")
+      .select(
+        "owner_id, starting_bid, business_name"
+      )
+      .eq("id", listing.id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+
+    if (ownerListingError) {
+      console.error(
+        "Failed to load owner listing:",
+        ownerListingError
+      );
+    }
+
+    if (ownerListingData) {
+      ownerListing =
+        ownerListingData as OwnerListing;
+
+      isOwner =
+        ownerListing.owner_id === user.id;
+
+      /*
+       * Only retrieve payment information for the
+       * authenticated owner.
+       */
+
+      const {
+        data: paymentData,
+        error: paymentError,
+      } = await supabase
+        .from("payment_orders")
+        .select("status, created_at")
+        .eq("listing_id", listing.id)
+        .eq("user_id", user.id)
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
+
+      if (paymentError) {
+        console.error(
+          "Failed to load payment status:",
+          paymentError
+        );
+      }
+
+      if (paymentData) {
+        latestPayment =
+          paymentData as PaymentOrder;
+      }
+    }
+  }
+
+  /*
+   * =====================================================
+   * OWNER PAYMENT ACTION
+   * =====================================================
+   *
+   * Payment can only be completed when:
+   *
+   * 1. Current user owns the listing
+   * 2. Listing is approved
+   * 3. Payment is not already paid
+   *
+   * Existing payment API performs the final server-side
+   * ownership/security validation again.
+   */
+
+  const canCompletePayment =
+    isOwner &&
+    listing.listing_status === "approved" &&
+    latestPayment?.status !== "paid";
+
+  /*
+   * =====================================================
+   * PUBLIC BID HISTORY
+   * =====================================================
    */
 
   const {
@@ -323,6 +419,10 @@ export default async function BusinessPage({
                         LIVE AUCTION
 
                       </span>
+                    ) : canCompletePayment ? (
+                      <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                        PAYMENT PENDING
+                      </span>
                     ) : (
                       <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
                         APPROVED
@@ -406,6 +506,25 @@ export default async function BusinessPage({
               </div>
 
             </div>
+
+            {/* =================================================
+                OWNER PAYMENT
+                ================================================= */}
+
+            {canCompletePayment && (
+              <div className="mt-8">
+                <CompletePaymentButton
+                  listingId={listing.id}
+                  businessName={
+                    listing.business_name
+                  }
+                  bidAmount={Number(
+                    ownerListing?.starting_bid ??
+                      listing.starting_bid
+                  )}
+                />
+              </div>
+            )}
 
             {/* =================================================
                 BID HISTORY
@@ -601,13 +720,44 @@ export default async function BusinessPage({
 
               <div className="p-7 sm:p-8">
 
-                <BidSection
-                  listingId={listing.id}
-                  currentBid={initialCurrentBid}
-                  listingStatus={
-                    listing.listing_status
-                  }
-                />
+                {listing.listing_status ===
+                "live" ? (
+                  <BidSection
+                    listingId={listing.id}
+                    currentBid={
+                      initialCurrentBid
+                    }
+                    listingStatus={
+                      listing.listing_status
+                    }
+                  />
+                ) : canCompletePayment ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+
+                    <p className="text-sm font-bold text-amber-800">
+                      Auction not live yet
+                    </p>
+
+                    <p className="mt-2 text-sm leading-6 text-amber-700">
+                      Complete the listing payment above
+                      to start this auction.
+                    </p>
+
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+
+                    <p className="text-sm font-bold text-slate-800">
+                      Auction not live yet
+                    </p>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      Bidding will become available once
+                      this business goes live.
+                    </p>
+
+                  </div>
+                )}
 
               </div>
 
@@ -676,12 +826,16 @@ export default async function BusinessPage({
                       listing.listing_status ===
                       "live"
                         ? "text-sm font-bold text-emerald-700"
+                        : canCompletePayment
+                        ? "text-sm font-bold text-amber-700"
                         : "text-sm font-bold text-amber-700"
                     }
                   >
                     {listing.listing_status ===
                     "live"
                       ? "Live"
+                      : canCompletePayment
+                      ? "Payment Pending"
                       : "Approved"}
                   </span>
 
