@@ -531,10 +531,10 @@ export default function Home() {
 
       <section
         id="top"
-        className="mx-auto grid max-w-7xl items-center gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pt-24 lg:grid-cols-[1.02fr_0.98fr] lg:pb-28"
+        className="mx-auto grid w-full min-w-0 max-w-7xl items-center gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pt-24 lg:grid-cols-[1.02fr_0.98fr] lg:pb-28"
       >
 
-        <div className="animate-rise">
+        <div className="min-w-0 animate-rise">
 
           <p className="mb-5 text-sm font-bold uppercase tracking-[0.2em] text-[#d94d28]">
             The new way to discover ownership
@@ -555,11 +555,11 @@ export default function Home() {
             marketplace built for serious opportunities.
           </p>
 
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-9 flex w-full flex-col gap-3 sm:flex-row">
 
             <a
               href="#explore"
-              className="rounded-lg bg-[#e4572e] px-6 py-3.5 text-center text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200"
+              className="w-full rounded-lg bg-[#e4572e] px-6 py-3.5 text-center text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 sm:w-auto"
             >
               Explore Businesses <Arrow />
             </a>
@@ -568,14 +568,14 @@ export default function Home() {
               onClick={() =>
                 setActiveModal("listing")
               }
-              className="rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-center text-sm font-bold text-slate-800 transition hover:-translate-y-0.5 hover:border-slate-500 focus:outline-none focus:ring-4 focus:ring-slate-200"
+              className="w-full rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-center text-sm font-bold text-slate-800 transition hover:-translate-y-0.5 hover:border-slate-500 focus:outline-none focus:ring-4 focus:ring-slate-200 sm:w-auto"
             >
               List Your Business
             </button>
 
           </div>
 
-          <div className="mt-10 flex items-center gap-8 text-sm text-slate-500">
+          <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5 text-sm text-slate-500">
 
             <span>
               <strong className="block text-xl text-slate-950">
@@ -604,24 +604,24 @@ export default function Home() {
 
         {/* ================= MARKETPLACE PREVIEW ================= */}
 
-        <div className="relative animate-float">
+        <div className="relative min-w-0 w-full animate-float">
 
           <div
             className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-orange-100/70 blur-3xl"
             aria-hidden="true"
           />
 
-          <div className="relative rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_24px_80px_rgba(15,23,42,0.12)] sm:p-6">
+          <div className="relative w-full min-w-0 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_24px_80px_rgba(15,23,42,0.12)] sm:p-6">
 
-            <div className="flex items-center justify-between border-b border-slate-100 pb-5">
+            <div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-100 pb-5">
 
-              <div>
+              <div className="min-w-0">
 
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
                   Marketplace
                 </p>
 
-                <p className="mt-1 font-bold text-slate-950">
+                <p className="mt-1 break-words font-bold text-slate-950">
                   {businessesLoading
                     ? "Loading..."
                     : topBusiness
@@ -1159,16 +1159,15 @@ export default function Home() {
 
                 </div>
 
-                {/* Mobile cards */}
-                <div className="space-y-4 p-4 sm:hidden">
+                {/* Mobile compact marketplace rows */}
+                <div className="divide-y divide-slate-100 sm:hidden">
 
                   {visibleLiveBids.map(
                     (business) => {
 
                       const globalRank =
                         liveBids.findIndex(
-                          (item) =>
-                            item.id === business.id
+                          (item) => item.id === business.id
                         ) + 1;
 
                       const website = getWebsiteUrl(
@@ -1177,83 +1176,74 @@ export default function Home() {
 
                       return (
 
-                        <article
+                        <div
                           key={business.id}
-                          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+                          className="px-4 py-4 transition active:bg-orange-50/50"
                         >
 
-                          <div className="p-4">
+                          <div className="flex items-start gap-3">
 
-                            <div className="flex items-start gap-3">
+                            <span
+                              className={
+                                globalRank <= 3
+                                  ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#102a43] text-xs font-black text-white"
+                                  : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500"
+                              }
+                            >
+                              #{globalRank}
+                            </span>
 
-                              <a
-                                href={`/business/${business.id}`}
-                                onClick={() =>
-                                  trackBusinessClick(
-                                    business.id,
-                                    "detail"
-                                  )
-                                }
-                                className="flex min-w-0 flex-1 items-start gap-3"
-                              >
+                            <a
+                              href={`/business/${business.id}`}
+                              onClick={() =>
+                                trackBusinessClick(
+                                  business.id,
+                                  "detail"
+                                )
+                              }
+                              className="flex min-w-0 flex-1 items-start gap-3"
+                            >
 
-                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#102a43] text-sm font-black text-white">
-                                  #{globalRank}
-                                </span>
+                              <BusinessLogo
+                                businessName={business.business_name}
+                                website={business.business_website}
+                              />
 
-                                <BusinessLogo
-                                  businessName={business.business_name}
-                                  website={business.business_website}
-                                />
-
-                                <div className="min-w-0 pt-0.5">
-                                  <p className="break-words text-[17px] font-black leading-6 text-slate-950">
-                                    {business.business_name}
-                                  </p>
-
-                                  <p className="mt-1 break-words text-sm leading-5 text-slate-500">
-                                    {business.location ??
-                                      "Location not provided"}
-                                  </p>
-                                </div>
-
-                              </a>
-
-                              <div className="shrink-0 text-right">
-
-                                <p className="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">
-                                  Current
+                              <div className="min-w-0 flex-1">
+                                <p className="break-words text-[15px] font-black leading-5 text-slate-950">
+                                  {business.business_name}
                                 </p>
 
-                                <p className="mt-1 text-2xl font-black leading-none text-slate-950">
-                                  ₹
-                                  {Number(
-                                    business.current_bid ?? 0
-                                  ).toLocaleString("en-IN")}
+                                <p className="mt-1 break-words text-xs leading-4 text-slate-500">
+                                  {business.category ?? "Uncategorized"}
+                                  {business.location
+                                    ? ` · ${business.location}`
+                                    : ""}
                                 </p>
 
+                                <p className="mt-2 text-xs font-bold text-slate-400">
+                                  See details ↗
+                                </p>
                               </div>
 
-                            </div>
+                            </a>
 
-                            <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-
-                              <p className="min-w-0 break-words text-sm font-bold text-slate-500">
-                                {business.category ??
-                                  "Uncategorized"}
+                            <div className="shrink-0 text-right">
+                              <p className="text-[10px] font-black uppercase tracking-[0.08em] text-slate-400">
+                                Current
                               </p>
-
-                              <span className="shrink-0 rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700">
-                                LIVE
-                              </span>
-
+                              <p className="mt-1 text-lg font-black leading-none text-[#d94d28]">
+                                ₹
+                                {Number(
+                                  business.current_bid ?? 0
+                                ).toLocaleString("en-IN")}
+                              </p>
                             </div>
 
                           </div>
 
-                          <div className="border-t border-slate-100 px-4 py-4">
-
-                            {website ? (
+                          {website && (
+                            <div className="mt-3 pl-[96px]">
                               <a
                                 href={website}
                                 target="_blank"
@@ -1264,19 +1254,14 @@ export default function Home() {
                                     "website"
                                   )
                                 }
-                                className="inline-flex items-center gap-2 text-base font-black text-[#d94d28] transition hover:text-[#102a43]"
+                                className="text-xs font-bold text-[#d94d28]"
                               >
-                                Visit official website <Arrow />
+                                Visit website ↗
                               </a>
-                            ) : (
-                              <span className="text-sm font-semibold text-slate-400">
-                                Website unavailable
-                              </span>
-                            )}
+                            </div>
+                          )}
 
-                          </div>
-
-                        </article>
+                        </div>
 
                       );
                     }
