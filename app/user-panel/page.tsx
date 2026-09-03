@@ -117,7 +117,14 @@ export default async function UserPanelPage({
   }
 
   /* =====================================================
-     PAYMENT PENDING LISTINGS
+     PAYMENT / AUCTION STATE
+     
+     IMPORTANT:
+     approved is an INTERNAL database state.
+     
+     User-facing:
+     approved + unpaid = Pending
+     live = Live
      ===================================================== */
 
   const isPaymentPending = (
@@ -135,11 +142,18 @@ export default async function UserPanelPage({
         business.id
       );
 
-    return payment?.status === "pending";
+    /*
+     * If there is no payment order yet,
+     * payment has not been completed.
+     *
+     * If payment exists but is not paid,
+     * it is also pending.
+     */
+    return payment?.status !== "paid";
   };
 
   /* =====================================================
-     PENDING BUSINESS
+     USER-FACING PENDING BUSINESS
      ===================================================== */
 
   const isPendingBusiness = (
@@ -154,12 +168,14 @@ export default async function UserPanelPage({
 
   /* =====================================================
      STATUS FILTERS
+     
+     Only Pending and Live are user-facing listing
+     states. Approved is intentionally removed.
      ===================================================== */
 
   const validStatusFilters = [
     "pending",
     "pending_review",
-    "approved",
     "live",
     "rejected",
   ];
@@ -176,19 +192,6 @@ export default async function UserPanelPage({
           ) {
             return isPendingBusiness(
               business
-            );
-          }
-
-          if (
-            statusFilter ===
-            "approved"
-          ) {
-            return (
-              business.listing_status ===
-                "approved" &&
-              !isPaymentPending(
-                business
-              )
             );
           }
 
@@ -233,8 +236,22 @@ export default async function UserPanelPage({
   const getStatusLabel = (
     business: Business
   ) => {
-    if (isPaymentPending(business)) {
+    if (isPendingBusiness(business)) {
       return "Pending";
+    }
+
+    if (
+      business.listing_status ===
+      "live"
+    ) {
+      return "Live";
+    }
+
+    if (
+      business.listing_status ===
+      "rejected"
+    ) {
+      return "Rejected";
     }
 
     return business.listing_status.replaceAll(
@@ -246,15 +263,8 @@ export default async function UserPanelPage({
   const getStatusClass = (
     business: Business
   ) => {
-    if (isPaymentPending(business)) {
+    if (isPendingBusiness(business)) {
       return "bg-amber-50 text-amber-700";
-    }
-
-    if (
-      business.listing_status ===
-      "approved"
-    ) {
-      return "bg-emerald-50 text-emerald-700";
     }
 
     if (
@@ -395,7 +405,7 @@ export default async function UserPanelPage({
             </p>
 
             <p className="mt-1 text-xs font-medium text-amber-700">
-              Payment or security review pending
+              Complete payment to start auction
             </p>
           </Link>
 
@@ -409,6 +419,10 @@ export default async function UserPanelPage({
 
             <p className="mt-2 text-3xl font-black text-blue-900">
               {liveCount}
+            </p>
+
+            <p className="mt-1 text-xs font-medium text-blue-700">
+              Auctions currently live
             </p>
           </Link>
 
@@ -551,9 +565,7 @@ export default async function UserPanelPage({
                             }`}
                           >
 
-                            {/* =================================================
-                                FULL ROW LINK FOR PENDING BUSINESSES
-                                ================================================= */}
+                            {/* FULL ROW LINK FOR PENDING */}
 
                             {pendingBusiness && (
                               <Link

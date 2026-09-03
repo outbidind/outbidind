@@ -130,10 +130,6 @@ export default async function BusinessPage({
 
   /* =====================================================
      OWNER CHECK
-     
-     We use the secure "my businesses" RPC.
-     
-     owner_id is NOT exposed to the public page.
      ===================================================== */
 
   let isOwner = false;
@@ -169,8 +165,7 @@ export default async function BusinessPage({
   /* =====================================================
      PAYMENT STATUS
      
-     Only the authenticated owner can read their own
-     payment order for this listing.
+     Only owner can read their payment order.
      ===================================================== */
 
   let latestPayment: PaymentOrder | null =
@@ -207,19 +202,38 @@ export default async function BusinessPage({
   }
 
   /* =====================================================
+     LISTING STATE
+     
+     Internal:
+       approved = waiting for payment
+       live = payment completed
+     
+     User-facing:
+       approved/unpaid = Pending
+       live = Live
+     ===================================================== */
+
+  const isLive =
+    listing.listing_status ===
+    "live";
+
+  const isPaymentPending =
+    listing.listing_status ===
+      "approved" &&
+    latestPayment?.status !==
+      "paid";
+
+  /* =====================================================
      OWNER PAYMENT ACTION
      
-     Approved + unpaid = owner can complete payment.
+     Only owner can complete payment.
      
-     If there is no payment order yet, we still allow the
-     owner to start the payment process. The server-side
-     create-order route will create the order securely.
+     No payment order is also considered pending.
      ===================================================== */
 
   const canCompletePayment =
     isOwner &&
-    listing.listing_status === "approved" &&
-    latestPayment?.status !== "paid";
+    isPaymentPending;
 
   /* =====================================================
      PUBLIC BID HISTORY
@@ -389,8 +403,7 @@ export default async function BusinessPage({
                       {listing.category}
                     </span>
 
-                    {listing.listing_status ===
-                    "live" ? (
+                    {isLive ? (
                       <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
 
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -398,7 +411,7 @@ export default async function BusinessPage({
                         LIVE AUCTION
 
                       </span>
-                    ) : canCompletePayment ? (
+                    ) : isPaymentPending ? (
                       <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
 
                         <span className="h-2 w-2 rounded-full bg-amber-500" />
@@ -406,11 +419,7 @@ export default async function BusinessPage({
                         PAYMENT PENDING
 
                       </span>
-                    ) : (
-                      <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
-                        APPROVED
-                      </span>
-                    )}
+                    ) : null}
 
                   </div>
 
@@ -494,6 +503,7 @@ export default async function BusinessPage({
 
             {canCompletePayment && (
               <div className="mt-8">
+
                 <CompletePaymentButton
                   listingId={listing.id}
                   businessName={
@@ -504,6 +514,7 @@ export default async function BusinessPage({
                       listing.starting_bid
                   )}
                 />
+
               </div>
             )}
 
@@ -530,8 +541,7 @@ export default async function BusinessPage({
 
                 </div>
 
-                {listing.listing_status ===
-                  "live" && (
+                {isLive && (
                   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
 
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -556,8 +566,9 @@ export default async function BusinessPage({
                   </p>
 
                   <p className="mt-2 text-sm text-slate-500">
-                    Be the first person to place a bid
-                    on this business.
+                    {isLive
+                      ? "Be the first person to place a bid on this business."
+                      : "Bidding will become available when this auction goes live."}
                   </p>
 
                 </div>
@@ -634,8 +645,7 @@ export default async function BusinessPage({
                     Current bid
                   </p>
 
-                  {listing.listing_status ===
-                    "live" && (
+                  {isLive && (
                     <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1.5 text-xs font-bold text-emerald-300">
 
                       <span className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -699,8 +709,7 @@ export default async function BusinessPage({
 
               <div className="p-7 sm:p-8">
 
-                {listing.listing_status ===
-                "live" ? (
+                {isLive ? (
                   <BidSection
                     listingId={listing.id}
                     currentBid={
@@ -711,6 +720,7 @@ export default async function BusinessPage({
                     }
                   />
                 ) : canCompletePayment ? (
+
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
 
                     <p className="text-sm font-bold text-amber-800">
@@ -730,7 +740,9 @@ export default async function BusinessPage({
                     </p>
 
                   </div>
+
                 ) : (
+
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
 
                     <p className="text-sm font-bold text-slate-800">
@@ -743,6 +755,7 @@ export default async function BusinessPage({
                     </p>
 
                   </div>
+
                 )}
 
               </div>
@@ -809,20 +822,14 @@ export default async function BusinessPage({
 
                   <span
                     className={
-                      listing.listing_status ===
-                      "live"
+                      isLive
                         ? "text-sm font-bold text-emerald-700"
-                        : canCompletePayment
-                        ? "text-sm font-bold text-amber-700"
                         : "text-sm font-bold text-amber-700"
                     }
                   >
-                    {listing.listing_status ===
-                    "live"
+                    {isLive
                       ? "Live"
-                      : canCompletePayment
-                      ? "Payment Pending"
-                      : "Approved"}
+                      : "Pending"}
                   </span>
 
                 </div>
