@@ -144,13 +144,16 @@ export default function Home() {
         return;
       }
 
-      // Check admin status through a SECURITY DEFINER RPC.
-      // Do NOT query user_roles directly from the browser.
-      const { data: adminStatus, error: adminStatusError } =
-        await supabase.rpc("is_current_user_admin");
+      const {
+        data: adminStatus,
+        error: adminStatusError,
+      } = await supabase.rpc("is_current_user_admin");
 
       if (adminStatusError) {
-        console.error("Failed to check admin status:", adminStatusError);
+        console.error(
+          "Failed to check admin status:",
+          adminStatusError
+        );
         setIsAdmin(false);
       } else {
         setIsAdmin(adminStatus === true);
@@ -172,13 +175,16 @@ export default function Home() {
           return;
         }
 
-        // Check admin status through a SECURITY DEFINER RPC.
-        // Do NOT query user_roles directly from the browser.
-        const { data: adminStatus, error: adminStatusError } =
-          await supabase.rpc("is_current_user_admin");
+        const {
+          data: adminStatus,
+          error: adminStatusError,
+        } = await supabase.rpc("is_current_user_admin");
 
         if (adminStatusError) {
-          console.error("Failed to check admin status:", adminStatusError);
+          console.error(
+            "Failed to check admin status:",
+            adminStatusError
+          );
           setIsAdmin(false);
         } else {
           setIsAdmin(adminStatus === true);
@@ -216,11 +222,9 @@ export default function Home() {
 
       const supabase = createClient();
 
-      // IMPORTANT:
-      // Do not read business_listings directly from the browser.
-      // Public marketplace data is exposed through the secure RPC.
-      const { data, error } = await supabase
-        .rpc("get_public_business_listings");
+      const { data, error } = await supabase.rpc(
+        "get_public_business_listings"
+      );
 
       if (error) {
         console.error(
@@ -281,10 +285,11 @@ export default function Home() {
 
   /* ================= TOP BUSINESSES ================= */
 
-  // Every paid/live listing should appear in the marketplace,
-  // even when nobody has placed a bid above the starting bid yet.
   const topBusinesses = [...approvedBusinesses]
-    .filter((business) => business.listing_status === "live")
+    .filter(
+      (business) =>
+        business.listing_status === "live"
+    )
     .sort(
       (a, b) =>
         Number(b.current_bid ?? 0) -
@@ -296,10 +301,11 @@ export default function Home() {
 
   /* ================= LIVE BIDS ================= */
 
-  // A live auction is visible even if its current bid
-  // is still equal to the starting bid.
   const liveBids = [...approvedBusinesses]
-    .filter((business) => business.listing_status === "live")
+    .filter(
+      (business) =>
+        business.listing_status === "live"
+    )
     .sort(
       (a, b) =>
         Number(b.current_bid ?? 0) -
@@ -360,16 +366,22 @@ export default function Home() {
       {/* ================= HEADER ================= */}
 
       <header className="relative z-50 border-b border-slate-200/80 bg-[#f6f7f5]/95 backdrop-blur">
+
         <nav
           className="mx-auto max-w-7xl px-5 py-4 sm:px-8 sm:py-5"
           aria-label="Main navigation"
         >
+
           <div className="flex items-center justify-between">
+
             <a
               href="#top"
               className="flex items-center gap-3"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() =>
+                setMobileMenuOpen(false)
+              }
             >
+
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">
                 O
               </span>
@@ -377,40 +389,63 @@ export default function Home() {
               <span className="text-lg font-bold tracking-tight text-slate-950">
                 OutbidInd
               </span>
+
             </a>
 
             {/* Desktop Navigation */}
 
             <div className="hidden items-center gap-8 text-sm font-semibold text-slate-600 md:flex">
-              <a className="transition hover:text-[#d94d28]" href="#explore">
+
+              <a
+                className="transition hover:text-[#d94d28]"
+                href="#explore"
+              >
                 Explore
               </a>
 
-              <a className="transition hover:text-[#d94d28]" href="#live-bids">
+              <a
+                className="transition hover:text-[#d94d28]"
+                href="#live-bids"
+              >
                 Live Bids
               </a>
 
-              <a className="transition hover:text-[#d94d28]" href="#how-it-works">
+              <a
+                className="transition hover:text-[#d94d28]"
+                href="#how-it-works"
+              >
                 How It Works
               </a>
 
-              <button type="button" className="transition hover:text-[#d94d28]" onClick={openListing}>
+              <button
+                type="button"
+                className="transition hover:text-[#d94d28]"
+                onClick={openListing}
+              >
                 List Your Business
               </button>
+
             </div>
 
             {/* Desktop Account */}
 
             <div className="hidden items-center gap-3 md:flex">
+
               {userEmail ? (
                 <>
                   {isAdmin ? (
-                    <a href="/admin" className="rounded-lg bg-[#e4572e] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#c94724]">
+                    <a
+                      href="/admin"
+                      className="rounded-lg bg-[#e4572e] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#c94724]"
+                    >
                       Dashboard
                     </a>
                   ) : (
                     <>
-                      <a href="/user-panel" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                      <a
+                        href="/user-panel"
+                        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                      >
                         My Panel
                       </a>
 
@@ -420,59 +455,122 @@ export default function Home() {
                     </>
                   )}
 
-                  <button type="button" className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800" onClick={handleLogout}>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                    onClick={handleLogout}
+                  >
                     Logout
                   </button>
                 </>
               ) : (
                 <>
-                  <button type="button" className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-orange-50" onClick={() => setActiveModal("login")}>
+                  <button
+                    type="button"
+                    className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-orange-50"
+                    onClick={() =>
+                      setActiveModal("login")
+                    }
+                  >
                     Login
                   </button>
 
-                  <button type="button" className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800" onClick={() => setActiveModal("signup")}>
+                  <button
+                    type="button"
+                    className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                    onClick={() =>
+                      setActiveModal("signup")
+                    }
+                  >
                     Sign up
                   </button>
                 </>
               )}
+
             </div>
 
             {/* Mobile Menu Button */}
 
             <button
               type="button"
-              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-label={
+                mobileMenuOpen
+                  ? "Close navigation menu"
+                  : "Open navigation menu"
+              }
               aria-expanded={mobileMenuOpen}
-              onClick={() => setMobileMenuOpen((open) => !open)}
+              onClick={() =>
+                setMobileMenuOpen(
+                  (open) => !open
+                )
+              }
               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-800 transition hover:bg-slate-50 md:hidden"
             >
+
               <span className="sr-only">
-                {mobileMenuOpen ? "Close menu" : "Open menu"}
+                {mobileMenuOpen
+                  ? "Close menu"
+                  : "Open menu"}
               </span>
-              <span className="text-xl leading-none" aria-hidden="true">
-                {mobileMenuOpen ? "×" : "☰"}
+
+              <span
+                className="text-xl leading-none"
+                aria-hidden="true"
+              >
+                {mobileMenuOpen
+                  ? "×"
+                  : "☰"}
               </span>
+
             </button>
+
           </div>
 
           {/* Mobile Navigation */}
 
           {mobileMenuOpen && (
             <div className="mt-4 border-t border-slate-200 pt-4 md:hidden">
+
               <div className="flex flex-col gap-1 text-sm font-semibold text-slate-700">
-                <a href="#explore" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]">
+
+                <a
+                  href="#explore"
+                  onClick={() =>
+                    setMobileMenuOpen(false)
+                  }
+                  className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
+                >
                   Explore
                 </a>
 
-                <a href="#live-bids" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]">
+                <a
+                  href="#live-bids"
+                  onClick={() =>
+                    setMobileMenuOpen(false)
+                  }
+                  className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
+                >
                   Live Bids
                 </a>
 
-                <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]">
+                <a
+                  href="#how-it-works"
+                  onClick={() =>
+                    setMobileMenuOpen(false)
+                  }
+                  className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
+                >
                   How It Works
                 </a>
 
-                <button type="button" className="rounded-lg px-4 py-3 text-left transition hover:bg-orange-50 hover:text-[#d94d28]" onClick={() => { setMobileMenuOpen(false); openListing(); }}>
+                <button
+                  type="button"
+                  className="rounded-lg px-4 py-3 text-left transition hover:bg-orange-50 hover:text-[#d94d28]"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openListing();
+                  }}
+                >
                   List Your Business
                 </button>
 
@@ -481,39 +579,77 @@ export default function Home() {
                 {userEmail ? (
                   <>
                     {isAdmin ? (
-                      <a href="/admin" onClick={() => setMobileMenuOpen(false)} className="rounded-lg bg-[#e4572e] px-4 py-3 text-center font-bold text-white transition hover:bg-[#c94724]">
+                      <a
+                        href="/admin"
+                        onClick={() =>
+                          setMobileMenuOpen(false)
+                        }
+                        className="rounded-lg bg-[#e4572e] px-4 py-3 text-center font-bold text-white transition hover:bg-[#c94724]"
+                      >
                         Dashboard
                       </a>
                     ) : (
                       <>
-                        <a href="/user-panel" onClick={() => setMobileMenuOpen(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-center font-bold text-slate-700 transition hover:bg-slate-50">
+                        <a
+                          href="/user-panel"
+                          onClick={() =>
+                            setMobileMenuOpen(false)
+                          }
+                          className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-center font-bold text-slate-700 transition hover:bg-slate-50"
+                        >
                           My Panel
                         </a>
+
                         <div className="truncate px-4 py-3 text-center text-xs font-semibold text-slate-500">
                           {userEmail}
                         </div>
                       </>
                     )}
 
-                    <button type="button" className="rounded-lg bg-slate-950 px-4 py-3 font-bold text-white transition hover:bg-slate-800" onClick={async () => { setMobileMenuOpen(false); await handleLogout(); }}>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-slate-950 px-4 py-3 font-bold text-white transition hover:bg-slate-800"
+                      onClick={async () => {
+                        setMobileMenuOpen(false);
+                        await handleLogout();
+                      }}
+                    >
                       Logout
                     </button>
                   </>
                 ) : (
                   <>
-                    <button type="button" className="rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-orange-50" onClick={() => { setMobileMenuOpen(false); setActiveModal("login"); }}>
+                    <button
+                      type="button"
+                      className="rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-orange-50"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setActiveModal("login");
+                      }}
+                    >
                       Login
                     </button>
 
-                    <button type="button" className="rounded-lg bg-slate-950 px-4 py-3 font-bold text-white transition hover:bg-slate-800" onClick={() => { setMobileMenuOpen(false); setActiveModal("signup"); }}>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-slate-950 px-4 py-3 font-bold text-white transition hover:bg-slate-800"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setActiveModal("signup");
+                      }}
+                    >
                       Sign up
                     </button>
                   </>
                 )}
+
               </div>
+
             </div>
           )}
+
         </nav>
+
       </header>
 
       {/* ================= AUTH MESSAGE ================= */}
@@ -555,20 +691,16 @@ export default function Home() {
             marketplace built for serious opportunities.
           </p>
 
+          {/* ================= HERO CTA ================= */}
+
           <div className="mt-9 flex w-full flex-col gap-3 sm:flex-row">
 
-            <a
-              href="#explore"
-              className="w-full rounded-lg bg-[#e4572e] px-6 py-3.5 text-center text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 sm:w-auto"
-            >
-              Explore Businesses <Arrow />
-            </a>
-
             <button
+              type="button"
               onClick={() =>
                 setActiveModal("listing")
               }
-              className="w-full rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-center text-sm font-bold text-slate-800 transition hover:-translate-y-0.5 hover:border-slate-500 focus:outline-none focus:ring-4 focus:ring-slate-200 sm:w-auto"
+              className="w-full rounded-lg bg-[#e4572e] px-6 py-3.5 text-center text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 sm:w-auto"
             >
               List Your Business
             </button>
@@ -722,11 +854,13 @@ export default function Home() {
                   <div className="mt-3 flex justify-between text-xs text-slate-400">
 
                     <span>
-                      {topBusiness.category ?? "Uncategorized"}
+                      {topBusiness.category ??
+                        "Uncategorized"}
                     </span>
 
                     <span>
-                      {topBusiness.location ?? "Location not provided"}
+                      {topBusiness.location ??
+                        "Location not provided"}
                     </span>
 
                   </div>
@@ -780,65 +914,74 @@ export default function Home() {
               ) : (
 
                 topBusinesses.map(
-                  (business, index) => {
+                  (business, index) => (
+                    <div
+                      key={business.id}
+                      className="flex items-center justify-between gap-4 border-t border-slate-100 py-3"
+                    >
 
-                    return (
-                      <div
-                        key={business.id}
-                        className="flex items-center justify-between gap-4 border-t border-slate-100 py-3"
+                      <a
+                        href={`/business/${business.id}`}
+                        onClick={() =>
+                          trackBusinessClick(
+                            business.id,
+                            "detail"
+                          )
+                        }
+                        className="flex min-w-0 items-center gap-3"
                       >
 
-                        <a
-                          href={`/business/${business.id}`}
-                          onClick={() =>
-                            trackBusinessClick(
-                              business.id,
-                              "detail"
-                            )
+                        <span className="text-xs font-bold text-[#d94d28]">
+                          #{index + 1}
+                        </span>
+
+                        <BusinessLogo
+                          businessName={
+                            business.business_name
                           }
-                          className="flex min-w-0 items-center gap-3"
-                        >
+                          website={
+                            business.business_website
+                          }
+                        />
 
-                          <span className="text-xs font-bold text-[#d94d28]">
-                            #{index + 1}
-                          </span>
+                        <div className="min-w-0">
 
-                          <BusinessLogo
-                            businessName={business.business_name}
-                            website={business.business_website}
-                          />
-
-                          <div className="min-w-0">
-                            <p className="break-words text-sm font-semibold text-slate-700 transition hover:text-[#d94d28]">
-                              {business.business_name}
-                            </p>
-
-                            <p className="mt-1 truncate text-xs text-slate-400">
-                              {business.category ?? "Uncategorized"} ·{" "}
-                              {business.location ?? "Location not provided"}
-                            </p>
-                          </div>
-
-                        </a>
-
-                        <div className="shrink-0 text-right">
-                          <strong className="text-sm font-black text-[#d94d28]">
-                            ₹
-                            {Number(
-                              business.current_bid ?? 0
-                            ).toLocaleString("en-IN")}
-                          </strong>
-
-                          <p className="mt-1 text-[11px] font-medium text-slate-400">
-                            {Number(
-                              business.click_count ?? 0
-                            ).toLocaleString("en-IN")} clicks
+                          <p className="break-words text-sm font-semibold text-slate-700 transition hover:text-[#d94d28]">
+                            {business.business_name}
                           </p>
+
+                          <p className="mt-1 truncate text-xs text-slate-400">
+                            {business.category ??
+                              "Uncategorized"}{" "}
+                            ·{" "}
+                            {business.location ??
+                              "Location not provided"}
+                          </p>
+
                         </div>
 
+                      </a>
+
+                      <div className="shrink-0 text-right">
+
+                        <strong className="text-sm font-black text-[#d94d28]">
+                          ₹
+                          {Number(
+                            business.current_bid ?? 0
+                          ).toLocaleString("en-IN")}
+                        </strong>
+
+                        <p className="mt-1 text-[11px] font-medium text-slate-400">
+                          {Number(
+                            business.click_count ?? 0
+                          ).toLocaleString("en-IN")}{" "}
+                          clicks
+                        </p>
+
                       </div>
-                    );
-                  }
+
+                    </div>
+                  )
                 )
 
               )}
@@ -932,7 +1075,9 @@ export default function Home() {
                     : `Showing ${Math.min(
                         liveBidsVisibleCount,
                         filteredLiveBids.length
-                      )} of ${filteredLiveBids.length} matching auctions`}
+                      )} of ${
+                        filteredLiveBids.length
+                      } matching auctions`}
                 </p>
 
               </div>
@@ -988,6 +1133,7 @@ export default function Home() {
               <>
 
                 {/* Desktop table */}
+
                 <div className="hidden overflow-x-auto sm:block">
 
                   <table className="w-full min-w-[760px] text-left">
@@ -1028,15 +1174,11 @@ export default function Home() {
                           const globalRank =
                             liveBids.findIndex(
                               (item) =>
-                                item.id === business.id
+                                item.id ===
+                                business.id
                             ) + 1;
 
-                          const website = getWebsiteUrl(
-                            business.business_website
-                          );
-
                           return (
-
                             <tr
                               key={business.id}
                               className="cursor-pointer transition hover:bg-orange-50/60"
@@ -1070,11 +1212,16 @@ export default function Home() {
                                 >
 
                                   <BusinessLogo
-                                    businessName={business.business_name}
-                                    website={business.business_website}
+                                    businessName={
+                                      business.business_name
+                                    }
+                                    website={
+                                      business.business_website
+                                    }
                                   />
 
                                   <div className="min-w-0">
+
                                     <p className="break-words font-bold text-slate-950 transition hover:text-[#d94d28]">
                                       {business.business_name}
                                     </p>
@@ -1083,6 +1230,7 @@ export default function Home() {
                                       {business.location ??
                                         "Location not provided"}
                                     </p>
+
                                   </div>
 
                                 </a>
@@ -1108,15 +1256,19 @@ export default function Home() {
                               </td>
 
                               <td className="px-5 py-5 text-right sm:px-6">
+
                                 <span className="text-xs font-semibold text-slate-400">
                                   {Number(
                                     business.click_count ?? 0
-                                  ).toLocaleString("en-IN")} clicks
+                                  ).toLocaleString(
+                                    "en-IN"
+                                  )}{" "}
+                                  clicks
                                 </span>
+
                               </td>
 
                             </tr>
-
                           );
                         }
                       )}
@@ -1128,6 +1280,7 @@ export default function Home() {
                 </div>
 
                 {/* Mobile compact marketplace rows */}
+
                 <div className="divide-y divide-slate-100 sm:hidden">
 
                   {visibleLiveBids.map(
@@ -1135,15 +1288,12 @@ export default function Home() {
 
                       const globalRank =
                         liveBids.findIndex(
-                          (item) => item.id === business.id
+                          (item) =>
+                            item.id ===
+                            business.id
                         ) + 1;
 
-                      const website = getWebsiteUrl(
-                        business.business_website
-                      );
-
                       return (
-
                         <div
                           key={business.id}
                           className="px-4 py-4 transition active:bg-orange-50/50"
@@ -1152,6 +1302,7 @@ export default function Home() {
                           <div className="flex items-start gap-3">
 
                             <div className="flex w-11 shrink-0 flex-col items-center gap-2">
+
                               <span
                                 className={
                                   globalRank <= 3
@@ -1163,9 +1314,14 @@ export default function Home() {
                               </span>
 
                               <BusinessLogo
-                                businessName={business.business_name}
-                                website={business.business_website}
+                                businessName={
+                                  business.business_name
+                                }
+                                website={
+                                  business.business_website
+                                }
                               />
+
                             </div>
 
                             <a
@@ -1178,12 +1334,15 @@ export default function Home() {
                               }
                               className="min-w-0 flex-1"
                             >
+
                               <p className="break-words text-[15px] font-black leading-5 text-slate-950 transition hover:text-[#d94d28]">
                                 {business.business_name}
                               </p>
 
                               <p className="mt-1 break-words text-xs leading-4 text-slate-500">
-                                {business.category ?? "Uncategorized"}
+                                {business.category ??
+                                  "Uncategorized"}
+
                                 {business.location
                                   ? ` · ${business.location}`
                                   : ""}
@@ -1192,26 +1351,34 @@ export default function Home() {
                               <p className="mt-2 text-[11px] font-semibold text-slate-400">
                                 {Number(
                                   business.click_count ?? 0
-                                ).toLocaleString("en-IN")} clicks
+                                ).toLocaleString(
+                                  "en-IN"
+                                )}{" "}
+                                clicks
                               </p>
+
                             </a>
 
                             <div className="shrink-0 text-right">
+
                               <p className="text-[10px] font-black uppercase tracking-[0.08em] text-slate-400">
                                 Current
                               </p>
+
                               <p className="mt-1 text-lg font-black leading-none text-[#d94d28]">
                                 ₹
                                 {Number(
                                   business.current_bid ?? 0
-                                ).toLocaleString("en-IN")}
+                                ).toLocaleString(
+                                  "en-IN"
+                                )}
                               </p>
+
                             </div>
 
                           </div>
 
                         </div>
-
                       );
                     }
                   )}
@@ -1227,7 +1394,8 @@ export default function Home() {
                       type="button"
                       onClick={() =>
                         setLiveBidsVisibleCount(
-                          (count) => count + 15
+                          (count) =>
+                            count + 15
                         )
                       }
                       className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-bold text-white transition hover:bg-[#e4572e]"
@@ -1236,18 +1404,16 @@ export default function Home() {
                     </button>
 
                   </div>
-
                 )}
 
                 {liveBidsVisibleCount >=
                   filteredLiveBids.length &&
                   filteredLiveBids.length > 15 && (
 
-                    <div className="border-t border-slate-100 px-5 py-4 text-center text-xs font-medium text-slate-400 sm:px-6">
-                      You have reached the end of the live auction list.
-                    </div>
-
-                  )}
+                  <div className="border-t border-slate-100 px-5 py-4 text-center text-xs font-medium text-slate-400 sm:px-6">
+                    You have reached the end of the live auction list.
+                  </div>
+                )}
 
               </>
 
@@ -1292,7 +1458,6 @@ export default function Home() {
           <div className="mt-10 grid gap-5 lg:grid-cols-3">
 
             {businessesLoading && (
-
               <div className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-10 text-center">
 
                 <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#e4572e]" />
@@ -1302,12 +1467,10 @@ export default function Home() {
                 </p>
 
               </div>
-
             )}
 
             {!businessesLoading &&
               businessesError && (
-
                 <div className="lg:col-span-3 rounded-2xl border border-red-200 bg-red-50 p-10 text-center">
 
                   <p className="text-sm font-semibold text-red-700">
@@ -1315,13 +1478,11 @@ export default function Home() {
                   </p>
 
                 </div>
-
               )}
 
             {!businessesLoading &&
               !businessesError &&
               approvedBusinesses.length === 0 && (
-
                 <div className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-10 text-center">
 
                   <p className="text-lg font-bold text-slate-950">
@@ -1334,7 +1495,6 @@ export default function Home() {
                   </p>
 
                 </div>
-
               )}
 
             {!businessesLoading &&
@@ -1362,7 +1522,6 @@ export default function Home() {
                       : null;
 
                   return (
-
                     <article
                       key={business.id}
                       className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-xl"
@@ -1410,11 +1569,9 @@ export default function Home() {
                         </p>
 
                         {business.description && (
-
                           <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-500">
                             {business.description}
                           </p>
-
                         )}
 
                         <div className="mt-7 grid grid-cols-2 gap-4 border-t border-slate-100 pt-5">
@@ -1458,7 +1615,6 @@ export default function Home() {
                         <div className="mt-5 flex items-center justify-between gap-3">
 
                           {website ? (
-
                             <a
                               href={website}
                               target="_blank"
@@ -1474,13 +1630,10 @@ export default function Home() {
                               Visit Website{" "}
                               <Arrow />
                             </a>
-
                           ) : (
-
                             <span className="text-sm text-slate-400">
                               Website unavailable
                             </span>
-
                           )}
 
                           <a
@@ -1501,7 +1654,6 @@ export default function Home() {
                       </div>
 
                     </article>
-
                   );
                 }
               )}
@@ -1556,7 +1708,6 @@ export default function Home() {
             ],
           ].map(
             ([number, title, copy]) => (
-
               <div
                 key={number}
                 className="border-t-2 border-slate-200 pt-5"
@@ -1575,7 +1726,6 @@ export default function Home() {
                 </p>
 
               </div>
-
             )
           )}
 
