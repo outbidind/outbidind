@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 const TEST_LISTING_ID =
-  "96880a92-b9b3-450b-b5e7-eeac9db09e25";
+ "092420ca-2040-4908-ad1f-39ca8e06bf12";
 
 export default function RlsTestPage() {
   async function runNormalUserBypassTest() {

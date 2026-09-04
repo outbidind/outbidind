@@ -566,21 +566,43 @@ async function analyzeWebsiteContent(
       let response: Response;
 
       try {
-        response = await fetch(
-          normalizedCurrent,
-          {
-            method: "GET",
-            redirect: "manual",
-            signal: controller.signal,
-            headers: {
-              Accept:
-                "text/html,application/xhtml+xml",
-              "User-Agent":
-                "OutbidInd-Security-Scanner/1.0",
-            },
-            cache: "no-store",
-          }
-        );
+        try {
+          response = await fetch(
+            normalizedCurrent,
+            {
+              method: "GET",
+              redirect: "manual",
+              signal: controller.signal,
+              headers: {
+                Accept:
+                  "text/html,application/xhtml+xml",
+                "User-Agent":
+                  "OutbidInd-Security-Scanner/1.0",
+              },
+              cache: "no-store",
+            }
+          );
+        } catch (fetchError) {
+          /*
+           * The URL has already passed Google Web Risk and
+           * SSRF/DNS safety checks above. A timeout, TLS error,
+           * DNS/network failure, or another fetch-level error
+           * must not be treated as proof that the website is
+           * malicious. Large/anti-bot websites can also reject
+           * automated scanners.
+           */
+          console.warn(
+            "Website could not be fetched for optional content analysis; Google Web Risk passed:",
+            {
+              website: normalizedCurrent,
+              error: fetchError,
+            }
+          );
+
+          return {
+            ok: true,
+          };
+        }
       } finally {
         clearTimeout(timeout);
       }
@@ -614,11 +636,37 @@ async function analyzeWebsiteContent(
         continue;
       }
 
+      /*
+       * Google Web Risk is the authoritative website reputation
+       * check. Some legitimate large websites (for example,
+       * major marketplaces/apps) may block automated requests
+       * with 403/429 or return HTML larger than our local
+       * content-analysis limit. Those conditions alone do NOT
+       * mean the website is malicious.
+       *
+       * Therefore:
+       * - Web Risk threat/error -> blocked above.
+       * - Redirect safety -> enforced above.
+       * - 403/429/other non-OK -> allow if Web Risk passed.
+       * - Non-HTML response -> allow if Web Risk passed.
+       * - HTML larger than the analysis limit -> skip local
+       *   content scan and allow if Web Risk passed.
+       *
+       * Local HTML scanning remains an additional layer when
+       * the site can actually be fetched and is small enough
+       * to inspect.
+       */
       if (!response.ok) {
+        console.warn(
+          "Website returned a non-OK response; Google Web Risk passed:",
+          {
+            website: normalizedCurrent,
+            status: response.status,
+          }
+        );
+
         return {
-          ok: false,
-          reason:
-            "This website could not be reached or verified. Please use a working official business website.",
+          ok: true,
         };
       }
 
@@ -632,10 +680,16 @@ async function analyzeWebsiteContent(
           contentType
         )
       ) {
+        console.warn(
+          "Website is not HTML; Google Web Risk passed:",
+          {
+            website: normalizedCurrent,
+            contentType,
+          }
+        );
+
         return {
-          ok: false,
-          reason:
-            "This website does not provide a readable business webpage and cannot be listed on OutbidInd.",
+          ok: true,
         };
       }
 
@@ -647,12 +701,19 @@ async function analyzeWebsiteContent(
         );
 
       if (
+        Number.isFinite(contentLength) &&
         contentLength > MAX_HTML_BYTES
       ) {
+        console.warn(
+          "Website HTML is larger than the local analysis limit; Google Web Risk passed:",
+          {
+            website: normalizedCurrent,
+            contentLength,
+          }
+        );
+
         return {
-          ok: false,
-          reason:
-            "This website is too large to safely analyze and cannot be listed on OutbidInd.",
+          ok: true,
         };
       }
 
@@ -665,10 +726,15 @@ async function analyzeWebsiteContent(
           .byteLength >
         MAX_HTML_BYTES
       ) {
+        console.warn(
+          "Website HTML exceeded the local analysis limit; Google Web Risk passed:",
+          {
+            website: normalizedCurrent,
+          }
+        );
+
         return {
-          ok: false,
-          reason:
-            "This website is too large to safely analyze and cannot be listed on OutbidInd.",
+          ok: true,
         };
       }
 

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 import BidSection from "@/components/BidSection";
+import CompletePaymentButton from "@/components/CompletePaymentButton";
+import TrackedWebsiteLink from "@/components/TrackedWebsiteLink";
 
 type PageProps = {
   params: Promise<{
@@ -11,7 +13,7 @@ type PageProps = {
   }>;
 };
 
-type PublicBusinessListing = {
+type BusinessListing = {
   id: string;
   business_name: string;
   category: string;
@@ -24,13 +26,6 @@ type PublicBusinessListing = {
   listing_status: string;
   created_at: string;
   updated_at: string;
-};
-
-type PublicBidRow = {
-  id: string;
-  listing_id: string;
-  amount: number | string;
-  created_at: string;
 };
 
 type Bid = {
@@ -88,17 +83,10 @@ export default async function BusinessPage({
   // =====================================================
   // PUBLIC BUSINESS LISTING
   // =====================================================
-  //
-  // IMPORTANT:
-  // Do NOT directly query business_listings here.
-  //
-  // Public users access business details through the
-  // secure get_public_business_listing() RPC.
-  //
-  // This keeps internal fields such as owner_id,
-  // admin review fields, AI review fields, etc. away
-  // from the public page.
-  // =====================================================
+
+  // Use the secure public RPC instead of directly selecting
+  // business_listings. The RPC intentionally does not expose
+  // owner_id or internal admin/security fields.
 
   const {
     data: listingData,
@@ -119,18 +107,10 @@ export default async function BusinessPage({
     notFound();
   }
 
-  // =====================================================
-  // NORMALIZE RPC RESULT
-  // =====================================================
-  //
-  // Supabase RPC returning TABLE normally gives an array.
-  // We safely take the first row.
-  // =====================================================
-
   const listingRows =
-    (listingData ?? []) as PublicBusinessListing[];
+    (listingData ?? []) as BusinessListing[];
 
-  const listing: PublicBusinessListing | null =
+  const listing: BusinessListing | null =
     Array.isArray(listingRows)
       ? listingRows[0] ?? null
       : null;
@@ -142,20 +122,15 @@ export default async function BusinessPage({
   // =====================================================
   // PUBLIC BID HISTORY
   // =====================================================
-  //
-  // We use the secure RPC instead of directly querying
-  // the bids table.
-  //
-  // bidder_id is intentionally not returned publicly.
-  // =====================================================
 
   const {
-    data: bidsData,
+    data: bids,
     error: bidsError,
   } = await supabase.rpc(
     "get_public_bid_history",
     {
-      p_listing_id: listing.id,
+      p_listing_id:
+        listing.id,
     }
   );
 
@@ -166,22 +141,30 @@ export default async function BusinessPage({
     );
   }
 
-  const bidRows =
-    (bidsData ?? []) as PublicBidRow[];
-
   const bidHistory: Bid[] =
-    bidRows.map(
-      (bid): Bid => ({
+    (bids ?? []).map(
+      (bid: {
+        id: string;
+        listing_id: string;
+        amount:
+          | number
+          | string;
+        created_at: string;
+      }) => ({
         id: bid.id,
-        listing_id: bid.listing_id,
-        amount: Number(bid.amount),
-        created_at: bid.created_at,
+
+        listing_id:
+          bid.listing_id,
+
+        amount:
+          Number(
+            bid.amount
+          ),
+
+        created_at:
+          bid.created_at,
       })
     );
-
-  // =====================================================
-  // AUCTION TOTAL
-  // =====================================================
 
   const initialCurrentBid =
     Number(
@@ -352,6 +335,35 @@ export default async function BusinessPage({
                     {listing.location}
                   </p>
 
+                  <div className="mt-6 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Starting Bid
+                      </p>
+                      <p className="mt-1 text-lg font-black text-slate-950">
+                        {formatMoney(listing.starting_bid)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Current Bid
+                      </p>
+                      <p className="mt-1 text-lg font-black text-[#d94d28]">
+                        {formatMoney(initialCurrentBid)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Status
+                      </p>
+                      <p className="mt-1 text-lg font-black uppercase text-slate-950">
+                        {listing.listing_status}
+                      </p>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
@@ -371,7 +383,6 @@ export default async function BusinessPage({
 
                 {listing.additional_information && (
                   <div className="mt-8 border-t border-slate-100 pt-8">
-
                     <p className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
                       Additional information
                     </p>
@@ -381,7 +392,6 @@ export default async function BusinessPage({
                         listing.additional_information
                       }
                     </p>
-
                   </div>
                 )}
 
@@ -392,15 +402,14 @@ export default async function BusinessPage({
                       Official website
                     </p>
 
-                    <a
+                    <TrackedWebsiteLink
                       href={website}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      listingId={listing.id}
                       className="mt-3 inline-flex items-center gap-2 font-bold text-[#e4572e] transition hover:text-[#102a43]"
                     >
                       Visit Business Website
                       <Arrow />
-                    </a>
+                    </TrackedWebsiteLink>
 
                   </div>
                 )}
@@ -670,114 +679,41 @@ export default async function BusinessPage({
 
               </div>
 
-              {/* BID FORM */}
+              {/* BID / PAYMENT ACTION */}
 
               <div className="p-7 sm:p-8">
-
-                <BidSection
-                  listingId={
-                    listing.id
-                  }
-                  currentBid={
-                    initialCurrentBid
-                  }
-                  listingStatus={
-                    listing.listing_status
-                  }
-                />
-
-              </div>
-
-            </div>
-
-            {/* AUCTION INFORMATION */}
-
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6">
-
-              <p className="font-bold text-slate-950">
-                Auction information
-              </p>
-
-              <div className="mt-5 space-y-4">
-
-                <div className="flex items-center justify-between gap-4">
-
-                  <span className="text-sm text-slate-500">
-                    Starting bid
-                  </span>
-
-                  <span className="text-sm font-bold text-slate-900">
-                    {formatMoney(
+                {listing.listing_status ===
+                  "live" ? (
+                  <BidSection
+                    listingId={
+                      listing.id
+                    }
+                    currentBid={
+                      initialCurrentBid
+                    }
+                    listingStatus={
+                      listing.listing_status
+                    }
+                  />
+                ) : (
+                  <CompletePaymentButton
+                    listingId={
+                      listing.id
+                    }
+                    businessName={
+                      listing.business_name
+                    }
+                    bidAmount={Number(
                       listing.starting_bid
                     )}
-                  </span>
-
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-
-                  <span className="text-sm text-slate-500">
-                    Auction total
-                  </span>
-
-                  <span className="text-sm font-bold text-slate-900">
-                    {formatMoney(
-                      initialCurrentBid
-                    )}
-                  </span>
-
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-
-                  <span className="text-sm text-slate-500">
-                    Minimum bid
-                  </span>
-
-                  <span className="text-sm font-bold text-slate-900">
-                    ₹99
-                  </span>
-
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-
-                  <span className="text-sm text-slate-500">
-                    Total bids
-                  </span>
-
-                  <span className="text-sm font-bold text-slate-900">
-                    {bidHistory.length}
-                  </span>
-
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-
-                  <span className="text-sm text-slate-500">
-                    Status
-                  </span>
-
-                  <span
-                    className={
-                      listing.listing_status ===
-                      "live"
-                        ? "text-sm font-bold text-emerald-700"
-                        : "text-sm font-bold text-amber-700"
+                    listingStatus={
+                      listing.listing_status
                     }
-                  >
-                    {listing.listing_status ===
-                    "live"
-                      ? "Live"
-                      : "Approved"}
-                  </span>
-
-                </div>
-
+                  />
+                )}
               </div>
 
             </div>
-
           </aside>
 
         </div>

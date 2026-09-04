@@ -103,6 +103,9 @@ export default function Home() {
   const [approvedBusinesses, setApprovedBusinesses] =
     useState<BusinessListing[]>([]);
 
+  const [bidCounts, setBidCounts] =
+    useState<Record<string, number>>({});
+
   const [liveBidSearch, setLiveBidSearch] = useState("");
 
   const [liveBidsVisibleCount, setLiveBidsVisibleCount] =
@@ -216,11 +219,16 @@ export default function Home() {
   /* ================= APPROVED BUSINESSES ================= */
 
   useEffect(() => {
-    const loadApprovedBusinesses = async () => {
-      setBusinessesLoading(true);
-      setBusinessesError("");
+    const supabase = createClient();
 
-      const supabase = createClient();
+    const loadApprovedBusinesses = async (
+      showLoading = false
+    ) => {
+      if (showLoading) {
+        setBusinessesLoading(true);
+      }
+
+      setBusinessesError("");
 
       const { data, error } = await supabase.rpc(
         "get_public_business_listings"
@@ -241,19 +249,92 @@ export default function Home() {
           "Unable to load businesses right now."
         );
 
-        setApprovedBusinesses([]);
         setBusinessesLoading(false);
         return;
       }
 
-      setApprovedBusinesses(
-        (data ?? []) as BusinessListing[]
+      const listings = (data ?? []) as BusinessListing[];
+
+      setApprovedBusinesses(listings);
+
+      const liveListings = listings.filter(
+        (listing) => listing.listing_status === "live"
       );
+
+      if (liveListings.length === 0) {
+        setBidCounts({});
+      } else {
+        const bidCountResults = await Promise.all(
+          liveListings.map(async (listing) => {
+            const { data: bidRows, error: bidHistoryError } =
+              await supabase.rpc(
+                "get_public_bid_history",
+                {
+                  p_listing_id: listing.id,
+                }
+              );
+
+            if (bidHistoryError) {
+              console.error(
+                "Failed to load bid history for count:",
+                listing.id,
+                bidHistoryError
+              );
+              return {
+                listingId: listing.id,
+                count: 0,
+              };
+            }
+
+            return {
+              listingId: listing.id,
+              count: (bidRows ?? []).length,
+            };
+          })
+        );
+
+        const counts: Record<string, number> = {};
+
+        for (const result of bidCountResults) {
+          counts[result.listingId] = result.count;
+        }
+
+        setBidCounts(counts);
+      }
 
       setBusinessesLoading(false);
     };
 
-    loadApprovedBusinesses();
+    // Initial secure public marketplace load.
+    void loadApprovedBusinesses(true);
+
+    // Realtime is used only as a change signal. We do NOT use
+    // the database payload directly because the homepage must
+    // continue receiving public marketplace data through the
+    // secure get_public_business_listings() RPC.
+    const channel = supabase
+      .channel("homepage-business-listings")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "business_listings",
+        },
+        () => {
+          void loadApprovedBusinesses(false);
+        }
+      )
+      .subscribe((status) => {
+        console.log(
+          "Homepage business realtime:",
+          status
+        );
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   /* ================= ACTIONS ================= */
@@ -410,6 +491,13 @@ export default function Home() {
                 Live Bids
               </a>
 
+              <a
+                className="transition hover:text-[#d94d28]"
+                href="#how-it-works"
+              >
+                How It Works
+              </a>
+
               <button
                 type="button"
                 className="transition hover:text-[#d94d28]"
@@ -544,6 +632,16 @@ export default function Home() {
                   className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
                 >
                   Live Bids
+                </a>
+
+                <a
+                  href="#how-it-works"
+                  onClick={() =>
+                    setMobileMenuOpen(false)
+                  }
+                  className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
+                >
+                  How It Works
                 </a>
 
                 <button
@@ -953,6 +1051,10 @@ export default function Home() {
                             business.current_bid ?? 0
                           ).toLocaleString("en-IN")}
                         </strong>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                          {bidCounts[business.id] ?? 0}{" "}
+                          {bidCounts[business.id] === 1 ? "bid" : "bids"}
+                        </p>
 
                         <p className="mt-1 text-[11px] font-medium text-slate-400">
                           {Number(
@@ -1141,11 +1243,10 @@ export default function Home() {
                           Current Bid
                         </th>
 
-                        <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-[0.12em] text-slate-400 sm:px-6">
+                        <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
                           Clicks
                         </th>
-
-                      </tr>
+</tr>
 
                     </thead>
 
@@ -1236,9 +1337,14 @@ export default function Home() {
                                   )}
                                 </p>
 
+                                <p className="mt-1 text-xs font-semibold text-slate-500">
+                                  {bidCounts[business.id] ?? 0}{" "}
+                                  {bidCounts[business.id] === 1 ? "bid" : "bids"}
+                                </p>
+
                               </td>
 
-                              <td className="px-5 py-5 text-right sm:px-6">
+                              <td className="px-5 py-5 text-right">
 
                                 <span className="text-xs font-semibold text-slate-400">
                                   {Number(
@@ -1250,8 +1356,7 @@ export default function Home() {
                                 </span>
 
                               </td>
-
-                            </tr>
+</tr>
                           );
                         }
                       )}
@@ -1647,6 +1752,75 @@ export default function Home() {
 
       </section>
 
+      {/* ================= HOW IT WORKS ================= */}
+
+      <section
+        id="how-it-works"
+        className="mx-auto max-w-7xl px-5 py-20 sm:px-8"
+      >
+
+        <div className="max-w-2xl">
+
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#d94d28]">
+            A clearer path forward
+          </p>
+
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+            From discovery to opportunity.
+          </h2>
+
+        </div>
+
+        <div className="mt-12 grid gap-8 md:grid-cols-4">
+
+          {[
+            [
+              "01",
+              "Discover",
+              "Find businesses available on OutbidInd.",
+            ],
+            [
+              "02",
+              "Review",
+              "Explore the business information and official website.",
+            ],
+            [
+              "03",
+              "Bid",
+              "Participate in continuous competitive bidding.",
+            ],
+            [
+              "04",
+              "Win",
+              "Become the successful bidder when the bidding process ends.",
+            ],
+          ].map(
+            ([number, title, copy]) => (
+              <div
+                key={number}
+                className="border-t-2 border-slate-200 pt-5"
+              >
+
+                <span className="text-sm font-bold text-[#d94d28]">
+                  {number}
+                </span>
+
+                <h3 className="mt-5 text-xl font-bold text-slate-950">
+                  {title}
+                </h3>
+
+                <p className="mt-3 text-sm leading-6 text-slate-500">
+                  {copy}
+                </p>
+
+              </div>
+            )
+          )}
+
+        </div>
+
+      </section>
+
       {/* ================= TRUST ================= */}
 
       <section className="bg-[#102a43] text-white">
@@ -1813,6 +1987,13 @@ export default function Home() {
             >
               List Your Business
             </button>
+
+            <a
+              href="#how-it-works"
+              className="hover:text-[#d94d28]"
+            >
+              How It Works
+            </a>
 
             <a
               href="#coming-soon"

@@ -10,6 +10,12 @@ type WebsiteSecurityResult = {
 const WEB_RISK_API_KEY =
   process.env.GOOGLE_WEB_RISK_API_KEY;
 
+/*
+ * =========================================================
+ * IPv4 SAFETY
+ * =========================================================
+ */
+
 function isPrivateOrReservedIPv4(
   ip: string
 ): boolean {
@@ -51,12 +57,12 @@ function isPrivateOrReservedIPv4(
     return true;
   }
 
-  // Loopback: 127.0.0.0/8
+  // 127.0.0.0/8
   if (a === 127) {
     return true;
   }
 
-  // Link-local: 169.254.0.0/16
+  // 169.254.0.0/16
   if (
     a === 169 &&
     b === 254
@@ -64,7 +70,7 @@ function isPrivateOrReservedIPv4(
     return true;
   }
 
-  // Current network / unspecified
+  // 0.0.0.0/8
   if (a === 0) {
     return true;
   }
@@ -72,25 +78,28 @@ function isPrivateOrReservedIPv4(
   return false;
 }
 
+/*
+ * =========================================================
+ * IPv6 SAFETY
+ * =========================================================
+ */
+
 function isPrivateOrReservedIPv6(
   ip: string
 ): boolean {
   const normalized =
     ip.toLowerCase().trim();
 
-  /*
-   * IPv6 loopback
-   */
+  // Loopback
   if (
     normalized === "::1" ||
-    normalized === "0:0:0:0:0:0:0:1"
+    normalized ===
+      "0:0:0:0:0:0:0:1"
   ) {
     return true;
   }
 
-  /*
-   * Unspecified IPv6
-   */
+  // Unspecified
   if (
     normalized === "::" ||
     normalized ===
@@ -99,30 +108,19 @@ function isPrivateOrReservedIPv6(
     return true;
   }
 
-  /*
-   * IPv4-mapped IPv6 addresses
-   *
-   * ::ffff:127.0.0.1
-   * ::ffff:192.168.1.1
-   */
+  // IPv4-mapped IPv6
   const ipv4MappedMatch =
     normalized.match(
       /::ffff:(\d+\.\d+\.\d+\.\d+)$/
     );
 
-  if (
-    ipv4MappedMatch
-  ) {
+  if (ipv4MappedMatch) {
     return isPrivateOrReservedIPv4(
       ipv4MappedMatch[1]
     );
   }
 
-  /*
-   * fc00::/7
-   *
-   * Unique local addresses.
-   */
+  // fc00::/7
   if (
     normalized.startsWith("fc") ||
     normalized.startsWith("fd")
@@ -130,11 +128,7 @@ function isPrivateOrReservedIPv6(
     return true;
   }
 
-  /*
-   * fe80::/10
-   *
-   * Link-local addresses.
-   */
+  // fe80::/10
   if (
     normalized.startsWith("fe8") ||
     normalized.startsWith("fe9") ||
@@ -161,15 +155,22 @@ function isIPv6(
   return value.includes(":");
 }
 
+/*
+ * =========================================================
+ * DNS RESOLUTION
+ * =========================================================
+ */
+
 async function resolveHostname(
-  hostname: string
+  hostname: string,
+  type: "A" | "AAAA"
 ): Promise<string[]> {
   try {
     const response =
       await fetch(
         `https://dns.google/resolve?name=${encodeURIComponent(
           hostname
-        )}&type=A`,
+        )}&type=${type}`,
         {
           method: "GET",
           cache: "no-store",
@@ -183,73 +184,54 @@ async function resolveHostname(
     const data =
       await response.json();
 
-    const ipv4Addresses =
-      Array.isArray(
-        data?.Answer
-      )
-        ? data.Answer
-            .filter(
-              (answer: any) =>
-                answer?.type === 1 &&
-                typeof answer?.data ===
-                  "string"
-            )
-            .map(
-              (answer: any) =>
-                answer.data
-            )
-        : [];
+    const expectedType =
+      type === "A" ? 1 : 28;
 
-    return ipv4Addresses;
-  } catch {
-    return [];
-  }
-}
-
-async function resolveHostnameIPv6(
-  hostname: string
-): Promise<string[]> {
-  try {
-    const response =
-      await fetch(
-        `https://dns.google/resolve?name=${encodeURIComponent(
-          hostname
-        )}&type=AAAA`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
-
-    if (!response.ok) {
+    if (
+      !Array.isArray(data?.Answer)
+    ) {
       return [];
     }
 
-    const data =
-      await response.json();
+    return data.Answer
+      .filter(
+        (answer: unknown) => {
+          if (
+            typeof answer !==
+              "object" ||
+            answer === null
+          ) {
+            return false;
+          }
 
-    const ipv6Addresses =
-      Array.isArray(
-        data?.Answer
+          const item =
+            answer as {
+              type?: number;
+              data?: unknown;
+            };
+
+          return (
+            item.type === expectedType &&
+            typeof item.data ===
+              "string"
+          );
+        }
       )
-        ? data.Answer
-            .filter(
-              (answer: any) =>
-                answer?.type === 28 &&
-                typeof answer?.data ===
-                  "string"
-            )
-            .map(
-              (answer: any) =>
-                answer.data
-            )
-        : [];
-
-    return ipv6Addresses;
+      .map(
+        (answer: {
+          data: string;
+        }) => answer.data
+      );
   } catch {
     return [];
   }
 }
+
+/*
+ * =========================================================
+ * DNS SAFETY
+ * =========================================================
+ */
 
 async function checkDnsSafety(
   hostname: string
@@ -257,20 +239,19 @@ async function checkDnsSafety(
   safe: boolean;
   reason?: string;
 }> {
-  const ipv4Addresses =
-    await resolveHostname(
-      hostname
-    );
-
-  const ipv6Addresses =
-    await resolveHostnameIPv6(
-      hostname
-    );
-
   /*
-   * If DNS returned IPv4 addresses,
-   * inspect them.
+   * Direct IPs are checked separately.
+   * For hostnames, inspect both IPv4 and IPv6.
    */
+
+  const [
+    ipv4Addresses,
+    ipv6Addresses,
+  ] = await Promise.all([
+    resolveHostname(hostname, "A"),
+    resolveHostname(hostname, "AAAA"),
+  ]);
+
   for (
     const address of ipv4Addresses
   ) {
@@ -287,9 +268,6 @@ async function checkDnsSafety(
     }
   }
 
-  /*
-   * Inspect IPv6 addresses too.
-   */
   for (
     const address of ipv6Addresses
   ) {
@@ -307,16 +285,22 @@ async function checkDnsSafety(
   }
 
   /*
-   * No DNS answer is not automatically
-   * treated as malicious.
+   * No DNS answer is NOT automatically
+   * considered malicious.
    *
-   * Web Risk may still have reputation
-   * information for the URL.
+   * Web Risk remains the reputation authority.
    */
+
   return {
     safe: true,
   };
 }
+
+/*
+ * =========================================================
+ * GOOGLE WEB RISK
+ * =========================================================
+ */
 
 async function checkWebRisk(
   websiteUrl: string
@@ -325,19 +309,18 @@ async function checkWebRisk(
   threats: string[];
   reason?: string;
 }> {
-  if (
-    !WEB_RISK_API_KEY
-  ) {
+  if (!WEB_RISK_API_KEY) {
     console.error(
       "GOOGLE_WEB_RISK_API_KEY is missing."
     );
 
     /*
-     * Fail closed for security review.
+     * Fail closed.
      *
-     * We do NOT automatically approve a URL
-     * when the reputation service is unavailable.
+     * If Web Risk is unavailable,
+     * we do NOT approve the website.
      */
+
     return {
       safe: false,
       threats: [],
@@ -361,6 +344,11 @@ async function checkWebRisk(
       "uri",
       websiteUrl
     );
+
+    /*
+     * Google Web Risk Lookup API
+     * supports multiple threatTypes.
+     */
 
     url.searchParams.append(
       "threatTypes",
@@ -400,6 +388,11 @@ async function checkWebRisk(
         }
       );
 
+      /*
+       * Do NOT reveal the Google API
+       * response or API key to the user.
+       */
+
       return {
         safe: false,
         threats: [],
@@ -418,16 +411,24 @@ async function checkWebRisk(
         ? data.threat.threatTypes
         : [];
 
-    if (
-      threats.length > 0
-    ) {
+    /*
+     * If Google returns one or more
+     * threat types, block the website.
+     */
+
+    if (threats.length > 0) {
       return {
         safe: false,
         threats,
         reason:
-          "The website matches a security threat list.",
+          "The website matches a Google Web Risk security threat list.",
       };
     }
+
+    /*
+     * Empty response means the URL
+     * was not found on the queried lists.
+     */
 
     return {
       safe: true,
@@ -448,22 +449,26 @@ async function checkWebRisk(
   }
 }
 
+/*
+ * =========================================================
+ * MAIN WEBSITE SECURITY CHECK
+ * =========================================================
+ */
+
 export async function checkWebsiteSecurity(
   websiteUrl: string
 ): Promise<WebsiteSecurityResult> {
   let parsedUrl: URL;
 
   /*
-   * =====================================================
+   * -------------------------------------------------------
    * 1. URL VALIDATION
-   * =====================================================
+   * -------------------------------------------------------
    */
 
   try {
     parsedUrl =
-      new URL(
-        websiteUrl
-      );
+      new URL(websiteUrl);
   } catch {
     return {
       status: "concern",
@@ -473,9 +478,9 @@ export async function checkWebsiteSecurity(
   }
 
   /*
-   * =====================================================
-   * 2. PROTOCOL
-   * =====================================================
+   * -------------------------------------------------------
+   * 2. HTTP / HTTPS ONLY
+   * -------------------------------------------------------
    */
 
   if (
@@ -492,9 +497,9 @@ export async function checkWebsiteSecurity(
   }
 
   /*
-   * =====================================================
+   * -------------------------------------------------------
    * 3. HOSTNAME
-   * =====================================================
+   * -------------------------------------------------------
    */
 
   const hostname =
@@ -511,51 +516,43 @@ export async function checkWebsiteSecurity(
   }
 
   /*
-   * =====================================================
-   * 4. DIRECT IP CHECK
-   * =====================================================
+   * -------------------------------------------------------
+   * 4. DIRECT IP SAFETY
+   * -------------------------------------------------------
    */
 
   if (
-    isIPv4(hostname)
+    isIPv4(hostname) &&
+    isPrivateOrReservedIPv4(
+      hostname
+    )
   ) {
-    if (
-      isPrivateOrReservedIPv4(
-        hostname
-      )
-    ) {
-      return {
-        status: "concern",
-        domain:
-          hostname,
-        reason:
-          "The website uses a private or reserved IPv4 address.",
-      };
-    }
+    return {
+      status: "concern",
+      domain: hostname,
+      reason:
+        "The website uses a private or reserved IPv4 address.",
+    };
   }
 
   if (
-    isIPv6(hostname)
+    isIPv6(hostname) &&
+    isPrivateOrReservedIPv6(
+      hostname
+    )
   ) {
-    if (
-      isPrivateOrReservedIPv6(
-        hostname
-      )
-    ) {
-      return {
-        status: "concern",
-        domain:
-          hostname,
-        reason:
-          "The website uses a private or reserved IPv6 address.",
-      };
-    }
+    return {
+      status: "concern",
+      domain: hostname,
+      reason:
+        "The website uses a private or reserved IPv6 address.",
+    };
   }
 
   /*
-   * =====================================================
+   * -------------------------------------------------------
    * 5. DNS SAFETY
-   * =====================================================
+   * -------------------------------------------------------
    */
 
   const dnsResult =
@@ -563,22 +560,20 @@ export async function checkWebsiteSecurity(
       hostname
     );
 
-  if (
-    !dnsResult.safe
-  ) {
+  if (!dnsResult.safe) {
     return {
       status: "concern",
-      domain:
-        hostname,
+      domain: hostname,
       reason:
-        dnsResult.reason,
+        dnsResult.reason ||
+        "The website failed DNS safety checks.",
     };
   }
 
   /*
-   * =====================================================
+   * -------------------------------------------------------
    * 6. GOOGLE WEB RISK
-   * =====================================================
+   * -------------------------------------------------------
    */
 
   const webRiskResult =
@@ -586,30 +581,27 @@ export async function checkWebsiteSecurity(
       parsedUrl.toString()
     );
 
-  if (
-    !webRiskResult.safe
-  ) {
+  if (!webRiskResult.safe) {
     return {
       status: "concern",
-      domain:
-        hostname,
+      domain: hostname,
       reason:
         webRiskResult.reason ||
-        "The website requires additional security review.",
+        "The website was identified as unsafe.",
       threats:
         webRiskResult.threats,
     };
   }
 
   /*
-   * =====================================================
-   * 7. FINAL PASS
-   * =====================================================
+   * -------------------------------------------------------
+   * 7. SECURITY PASS
+   * -------------------------------------------------------
    */
 
   return {
     status: "pass",
-    domain:
-      hostname,
+    domain: hostname,
+    threats: [],
   };
 }

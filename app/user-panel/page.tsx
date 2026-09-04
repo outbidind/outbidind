@@ -565,17 +565,8 @@ export default async function UserPanelPage({
                             }`}
                           >
 
-                            {/* FULL ROW LINK FOR PENDING */}
-
-                            {pendingBusiness && (
-                              <Link
-                                href={`/business/${business.id}`}
-                                aria-label={`Open ${business.business_name}`}
-                                className="absolute inset-0 z-0"
-                              />
-                            )}
-
                             {/* BUSINESS */}
+
 
                             <td className="relative z-10 px-5 py-5">
 

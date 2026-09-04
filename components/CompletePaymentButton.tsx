@@ -1,20 +1,139 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import PaymentPage from "@/components/PaymentPage";
+import { createClient } from "@/lib/supabase/client";
 
 type CompletePaymentButtonProps = {
   listingId: string;
   businessName: string;
   bidAmount: number;
+  listingStatus: string;
 };
 
 export default function CompletePaymentButton({
   listingId,
   businessName,
   bidAmount,
+  listingStatus,
 }: CompletePaymentButtonProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] =
+    useState(false);
+
+  const [checking, setChecking] =
+    useState(true);
+
+  const [paymentRequired, setPaymentRequired] =
+    useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const checkPaymentStatus =
+      async () => {
+        if (listingStatus !== "approved") {
+          if (active) {
+            setChecking(false);
+          }
+
+          return;
+        }
+
+        try {
+          const supabase =
+            createClient();
+
+          const {
+            data: {
+              user,
+            },
+          } =
+            await supabase.auth.getUser();
+
+          if (!user) {
+            if (active) {
+              setPaymentRequired(false);
+              setChecking(false);
+            }
+
+            return;
+          }
+
+          const {
+            data: paymentOrder,
+            error,
+          } =
+            await supabase
+              .from("payment_orders")
+              .select("id, status")
+              .eq(
+                "listing_id",
+                listingId
+              )
+              .eq(
+                "user_id",
+                user.id
+              )
+              .in("status", [
+                "pending",
+                "created",
+              ])
+              .order("created_at", {
+                ascending: false,
+              })
+              .limit(1)
+              .maybeSingle();
+
+          if (error) {
+            console.error(
+              "Failed to check payment status:",
+              error
+            );
+
+            if (active) {
+              setPaymentRequired(false);
+              setChecking(false);
+            }
+
+            return;
+          }
+
+          if (active) {
+            setPaymentRequired(
+              Boolean(paymentOrder)
+            );
+            setChecking(false);
+          }
+        } catch (error) {
+          console.error(
+            "Payment status check failed:",
+            error
+          );
+
+          if (active) {
+            setPaymentRequired(false);
+            setChecking(false);
+          }
+        }
+      };
+
+    void checkPaymentStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [listingId, listingStatus]);
+
+  if (
+    checking ||
+    !paymentRequired
+  ) {
+    return null;
+  }
 
   if (open) {
     return (
@@ -23,7 +142,9 @@ export default function CompletePaymentButton({
           listingId={listingId}
           businessName={businessName}
           bidAmount={bidAmount}
-          onBack={() => setOpen(false)}
+          onBack={() =>
+            setOpen(false)
+          }
         />
       </div>
     );
@@ -52,16 +173,24 @@ export default function CompletePaymentButton({
             </p>
 
             <p className="mt-1 text-2xl font-black text-slate-950">
-              ₹{Number(bidAmount).toLocaleString("en-IN")}
+              ₹
+              {Number(
+                bidAmount
+              ).toLocaleString(
+                "en-IN"
+              )}
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={() =>
+              setOpen(true)
+            }
             className="rounded-xl bg-[#e4572e] px-5 py-3 text-sm font-black text-white transition hover:bg-[#c94724]"
           >
-            Complete Payment & Start Auction
+            Complete Payment &
+            Start Auction
           </button>
         </div>
       </div>
