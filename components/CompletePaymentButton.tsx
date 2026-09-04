@@ -30,13 +30,17 @@ export default function CompletePaymentButton({
   const [paymentRequired, setPaymentRequired] =
     useState(false);
 
+  const [currentListingStatus, setCurrentListingStatus] =
+    useState(listingStatus);
+
   useEffect(() => {
     let active = true;
 
     const checkPaymentStatus =
       async () => {
-        if (listingStatus !== "approved") {
+        if (currentListingStatus !== "approved") {
           if (active) {
+            setPaymentRequired(false);
             setChecking(false);
           }
 
@@ -96,11 +100,69 @@ export default function CompletePaymentButton({
     return () => {
       active = false;
     };
-  }, [listingId, listingStatus]);
+  }, [listingId, currentListingStatus]);
+
+  /*
+   * Realtime listing status update.
+   *
+   * When payment verification changes:
+   *
+   * approved → live
+   *
+   * Supabase sends the UPDATE event here.
+   */
+  useEffect(() => {
+    const supabase =
+      createClient();
+
+    const channel =
+      supabase
+        .channel(
+          `business-listing-status-${listingId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "business_listings",
+            filter: `id=eq.${listingId}`,
+          },
+          (payload) => {
+            const newStatus =
+              String(
+                payload.new?.listing_status ?? ""
+              );
+
+            if (!newStatus) {
+              return;
+            }
+
+            setCurrentListingStatus(
+              newStatus
+            );
+
+            if (
+              newStatus === "live"
+            ) {
+              setPaymentRequired(false);
+              setOpen(false);
+            }
+          }
+        )
+        .subscribe();
+
+    return () => {
+      void supabase.removeChannel(
+        channel
+      );
+    };
+  }, [listingId]);
 
   if (
     checking ||
-    !paymentRequired
+    !paymentRequired ||
+    currentListingStatus !== "approved"
   ) {
     return null;
   }
