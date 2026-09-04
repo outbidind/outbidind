@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Modal from "@/components/Modal";
 import { LoginForm, SignupForm } from "@/components/ModalForms";
 import { BusinessListingForm } from "@/components/BusinessListingForm";
@@ -463,12 +464,17 @@ export default function Home() {
               }
             >
 
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">
-                O
-              </span>
+              <Image
+                src="/logo.png"
+                alt="OutbidInd"
+                width={36}
+                height={36}
+                priority
+                className="h-9 w-9 object-contain"
+              />
 
               <span className="text-lg font-bold tracking-tight text-slate-950">
-                OutbidInd
+                Outbid<span className="text-[#e4572e]">Ind</span>
               </span>
 
             </a>
