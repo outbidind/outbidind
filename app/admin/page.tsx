@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -149,7 +150,7 @@ export default async function AdminPage() {
 
   /* =========================================================
      PAYMENT PENDING CHECK
-     
+
      Internal DB state:
        approved + unpaid = pending
   ========================================================= */
@@ -174,9 +175,9 @@ export default async function AdminPage() {
 
   /* =========================================================
      PENDING LISTINGS
-     
+
      Pending includes:
-     
+
      1. pending_review
      2. approved but payment not completed
   ========================================================= */
@@ -191,7 +192,7 @@ export default async function AdminPage() {
 
   /* =========================================================
      APPROVED LISTINGS
-     
+
      Keep approved businesses internally available,
      but exclude unpaid approved listings because those
      are now displayed as Pending.
@@ -385,15 +386,28 @@ export default async function AdminPage() {
 
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-6">
 
-          <div>
+          <div className="flex items-center gap-3">
 
-            <p className="text-sm font-medium text-zinc-500">
-              OutbidInd
-            </p>
+            <Image
+              src="/logo.png"
+              alt="OutbidInd"
+              width={32}
+              height={32}
+              priority
+              className="h-8 w-8 object-contain"
+            />
 
-            <h1 className="text-2xl font-bold text-zinc-900">
-              Admin Dashboard
-            </h1>
+            <div>
+
+              <p className="text-sm font-medium text-zinc-500">
+                Outbid<span className="text-[#e4572e]">Ind</span>
+              </p>
+
+              <h1 className="text-2xl font-bold text-zinc-900">
+                Admin Dashboard
+              </h1>
+
+            </div>
 
           </div>
 
@@ -450,7 +464,7 @@ export default async function AdminPage() {
 
           {/* =================================================
               PENDING CARD
-              
+
               CLICK → PENDING SECTION
           ================================================= */}
 
@@ -475,7 +489,7 @@ export default async function AdminPage() {
 
           {/* =================================================
               LIVE CARD
-              
+
               CLICK → LIVE SECTION
           ================================================= */}
 

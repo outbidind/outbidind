@@ -1953,12 +1953,16 @@ export default function Home() {
               className="flex items-center gap-3"
             >
 
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e4572e] text-xs font-black text-white">
-                O
-              </span>
+              <Image
+                src="/logo.png"
+                alt="OutbidInd"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-contain"
+              />
 
               <span className="font-bold text-slate-950">
-                OutbidInd
+                Outbid<span className="text-[#e4572e]">Ind</span>
               </span>
 
             </a>

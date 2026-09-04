@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
 type LiveBusiness = {
@@ -252,12 +253,17 @@ export default function LiveBidsPage() {
             href="/"
             className="flex items-center gap-3"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">
-              O
-            </span>
+            <Image
+              src="/logo.png"
+              alt="OutbidInd"
+              width={36}
+              height={36}
+              priority
+              className="h-9 w-9 object-contain"
+            />
 
             <span className="text-lg font-bold tracking-tight text-slate-950">
-              OutbidInd
+              Outbid<span className="text-[#e4572e]">Ind</span>
             </span>
           </a>
 
@@ -351,8 +357,7 @@ export default function LiveBidsPage() {
               {filteredBusinesses.length} matching business
               {filteredBusinesses.length === 1
                 ? ""
-                : "es"}
-              .
+                : "es"}.
               Search results keep their original auction ranking.
             </p>
           )}

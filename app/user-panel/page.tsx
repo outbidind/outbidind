@@ -1,5 +1,6 @@
 ﻿import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import BidForm from "@/components/BidForm";
 import PanelMobileMenu from "@/components/PanelMobileMenu";
@@ -118,10 +119,10 @@ export default async function UserPanelPage({
 
   /* =====================================================
      PAYMENT / AUCTION STATE
-     
+
      IMPORTANT:
      approved is an INTERNAL database state.
-     
+
      User-facing:
      approved + unpaid = Pending
      live = Live
@@ -168,7 +169,7 @@ export default async function UserPanelPage({
 
   /* =====================================================
      STATUS FILTERS
-     
+
      Only Pending and Live are user-facing listing
      states. Approved is intentionally removed.
      ===================================================== */
@@ -317,12 +318,17 @@ export default async function UserPanelPage({
             href="/"
             className="flex items-center gap-3"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">
-              O
-            </span>
+            <Image
+              src="/logo.png"
+              alt="OutbidInd"
+              width={36}
+              height={36}
+              priority
+              className="h-9 w-9 object-contain"
+            />
 
             <span className="text-lg font-bold tracking-tight text-slate-950">
-              OutbidInd
+              Outbid<span className="text-[#e4572e]">Ind</span>
             </span>
           </Link>
 
