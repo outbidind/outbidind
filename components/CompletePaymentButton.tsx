@@ -63,49 +63,19 @@ export default function CompletePaymentButton({
             return;
           }
 
-          const {
-            data: paymentOrder,
-            error,
-          } =
-            await supabase
-              .from("payment_orders")
-              .select("id, status")
-              .eq(
-                "listing_id",
-                listingId
-              )
-              .eq(
-                "user_id",
-                user.id
-              )
-              .in("status", [
-                "pending",
-                "created",
-              ])
-              .order("created_at", {
-                ascending: false,
-              })
-              .limit(1)
-              .maybeSingle();
-
-          if (error) {
-            console.error(
-              "Failed to check payment status:",
-              error
-            );
-
-            if (active) {
-              setPaymentRequired(false);
-              setChecking(false);
-            }
-
-            return;
-          }
-
+          /*
+           * The payment order is created when the user
+           * clicks the payment button.
+           *
+           * Therefore the button must NOT depend on an
+           * existing pending payment_orders row.
+           *
+           * The server-side create-order route will verify
+           * that the logged-in user is authorized to pay
+           * for this listing.
+           */
           if (active) {
-            setPaymentRequired(
-              Boolean(paymentOrder)
-            );
+            setPaymentRequired(true);
             setChecking(false);
           }
         } catch (error) {

@@ -3,6 +3,7 @@ import crypto from "crypto";
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { sendLiveBusinessEmail } from "@/lib/notifications";
 
 export async function POST(request: Request) {
   try {
@@ -32,17 +33,13 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const paymentOrderId =
-      body?.paymentOrderId;
+    const paymentOrderId = body?.paymentOrderId;
 
-    const razorpayPaymentId =
-      body?.razorpay_payment_id;
+    const razorpayPaymentId = body?.razorpay_payment_id;
 
-    const razorpayOrderId =
-      body?.razorpay_order_id;
+    const razorpayOrderId = body?.razorpay_order_id;
 
-    const razorpaySignature =
-      body?.razorpay_signature;
+    const razorpaySignature = body?.razorpay_signature;
 
     if (
       !paymentOrderId ||
@@ -53,8 +50,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Incomplete payment verification data.",
+          error: "Incomplete payment verification data.",
         },
         { status: 400 }
       );
@@ -95,8 +91,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Unable to verify the payment order.",
+          error: "Unable to verify the payment order.",
         },
         { status: 500 }
       );
@@ -106,8 +101,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Payment order not found or unauthorized.",
+          error: "Payment order not found or unauthorized.",
         },
         { status: 404 }
       );
@@ -124,8 +118,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Razorpay order mismatch.",
+          error: "Razorpay order mismatch.",
         },
         { status: 400 }
       );
@@ -133,14 +126,49 @@ export async function POST(request: Request) {
 
     /* =====================================================
        ACTIVATE LISTING
-       
+
        Payment verified:
-       
+
        approved → live
-       
+
        This is the only place where a listing becomes
        live through the listing-payment flow.
        ===================================================== */
+
+    const sendLiveEmail = async (businessName: string) => {
+      console.log(
+        "SENDING LIVE EMAIL TO:",
+        user.email
+      );
+
+      console.log(
+        "LIVE EMAIL BUSINESS:",
+        businessName
+      );
+
+      console.log(
+        "LIVE EMAIL LISTING ID:",
+        paymentOrder.listing_id
+      );
+
+      try {
+        const result = await sendLiveBusinessEmail({
+          to: user.email,
+          businessName,
+          listingId: paymentOrder.listing_id,
+        });
+
+        console.log(
+          "LIVE EMAIL SENT:",
+          result
+        );
+      } catch (emailError) {
+        console.error(
+          "Live business email failed:",
+          emailError
+        );
+      }
+    };
 
     const activateListing = async () => {
       const {
@@ -150,8 +178,7 @@ export async function POST(request: Request) {
         .from("business_listings")
         .update({
           listing_status: "live",
-          updated_at:
-            new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq(
           "id",
@@ -236,6 +263,11 @@ export async function POST(request: Request) {
           existingListing?.listing_status ===
           "live"
         ) {
+          console.log(
+            "LISTING ALREADY LIVE - LIVE EMAIL NOT SENT FROM THIS PATH:",
+            existingListing.id
+          );
+
           return {
             success: true,
             listing: existingListing,
@@ -251,6 +283,25 @@ export async function POST(request: Request) {
           listing: null,
         };
       }
+
+      console.log(
+        "LISTING ACTIVATED SUCCESSFULLY:",
+        listing.id,
+        listing.business_name
+      );
+
+      /*
+       * Send LIVE email after approved → live succeeds.
+       */
+
+      await sendLiveEmail(
+        listing.business_name
+      );
+
+      console.log(
+        "LIVE EMAIL PROCESS COMPLETED FOR:",
+        listing.business_name
+      );
 
       return {
         success: true,
@@ -505,6 +556,7 @@ export async function POST(request: Request) {
        *
        * A retry can safely complete activation.
        */
+
       return NextResponse.json(
         {
           success: false,

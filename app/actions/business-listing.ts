@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkWebsiteSecurity } from "@/app/actions/website-security";
+import { sendPendingBusinessEmail } from "@/lib/notifications";
 
 type SubmitBusinessListingInput = {
   businessName: string;
@@ -1187,6 +1188,14 @@ export async function submitBusinessListing(
      * Resume payment.
      */
 
+    void sendPendingBusinessEmail({
+      to: user.email,
+      businessName: existingListing.business_name,
+      listingId: existingListing.id,
+    }).catch((emailError) => {
+      console.error("Pending business email failed:", emailError);
+    });
+
     return {
       success: true,
       resumePayment: true,
@@ -1372,7 +1381,27 @@ export async function submitBusinessListing(
 
   /*
    * =====================================================
-   * 9. SUCCESS
+   * 9. PENDING PAYMENT NOTIFICATION
+   * =====================================================
+   *
+   * Security has passed and the listing is approved, but
+   * approved != live. The owner still needs to complete
+   * the listing payment.
+   *
+   * Email failure must never block the listing flow.
+   */
+
+  void sendPendingBusinessEmail({
+    to: user.email,
+    businessName,
+    listingId: listing.id,
+  }).catch((emailError) => {
+    console.error("Pending business email failed:", emailError);
+  });
+
+  /*
+   * =====================================================
+   * 10. SUCCESS
    * =====================================================
    */
 
