@@ -321,13 +321,13 @@ export default async function UserPanelPage({
             <Image
               src="/logo.png"
               alt="OutbidInd"
-              width={36}
-              height={36}
+              width={44}
+              height={44}
               priority
-              className="h-9 w-9 object-contain"
+              className="h-11 w-11 object-contain"
             />
 
-            <span className="text-lg font-bold tracking-tight text-slate-950">
+            <span className="text-xl font-bold tracking-tight text-slate-950">
               Outbid<span className="text-[#e4572e]">Ind</span>
             </span>
           </Link>

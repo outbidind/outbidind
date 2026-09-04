@@ -467,13 +467,13 @@ export default function Home() {
               <Image
                 src="/logo.png"
                 alt="OutbidInd"
-                width={36}
-                height={36}
+                width={44}
+                height={44}
                 priority
-                className="h-9 w-9 object-contain"
+                className="h-11 w-11 object-contain"
               />
 
-              <span className="text-lg font-bold tracking-tight text-slate-950">
+              <span className="text-xl font-bold tracking-tight text-slate-950">
                 Outbid<span className="text-[#e4572e]">Ind</span>
               </span>
 
@@ -1956,12 +1956,12 @@ export default function Home() {
               <Image
                 src="/logo.png"
                 alt="OutbidInd"
-                width={32}
-                height={32}
-                className="h-8 w-8 object-contain"
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
               />
 
-              <span className="font-bold text-slate-950">
+              <span className="text-lg font-bold text-slate-950">
                 Outbid<span className="text-[#e4572e]">Ind</span>
               </span>
 
