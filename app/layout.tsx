@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import TermsAcceptanceModal from "@/components/TermsAcceptanceModal";
+import PagePreloader from "@/components/PagePreloader";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,6 +28,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <PagePreloader />
         {children}
         <TermsAcceptanceModal />
       </body>
