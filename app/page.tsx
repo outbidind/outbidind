@@ -1971,6 +1971,71 @@ export default function Home() {
               A thoughtful marketplace for business opportunity.
             </p>
 
+            <a
+              href="mailto:outbidind.ofc@gmail.com"
+              className="mt-2 inline-block text-sm font-semibold text-slate-600 transition hover:text-[#d94d28]"
+            >
+              outbidind.ofc@gmail.com
+            </a>
+
+            <div className="mt-4 flex items-center gap-3">
+
+              <a
+                href="https://x.com/OutbidInd"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="OutbidInd on X"
+                title="X"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-[#d94d28] hover:text-[#d94d28]"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817-5.964 6.817H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
+                </svg>
+              </a>
+
+              <a
+                href="https://www.instagram.com/outbidind?igsi=bWEyd2RwdXM3bHJz"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="OutbidInd on Instagram"
+                title="Instagram"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-[#d94d28] hover:text-[#d94d28]"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                </svg>
+              </a>
+
+              <a
+                href="https://www.facebook.com/share/19NmAafuR7/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="OutbidInd on Facebook"
+                title="Facebook"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-[#d94d28] hover:text-[#d94d28]"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="currentColor">
+                  <path d="M13.5 21v-8h2.75l.5-3h-3.25V8.05c0-.87.24-1.55 1.6-1.55h1.8V3.82c-.31-.04-1.37-.14-2.6-.14-2.57 0-4.33 1.57-4.33 4.45V10H7.5v3h2.47v8h3.53Z" />
+                </svg>
+              </a>
+
+              <a
+                href="https://www.reddit.com/u/outbidind/s/l4xdzClzh1"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="OutbidInd on Reddit"
+                title="Reddit"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-[#d94d28] hover:text-[#d94d28]"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="currentColor">
+                  <path d="M21.6 12.04c0-1.1-.9-2-2-2-.54 0-1.03.22-1.39.57-1.37-.9-3.1-1.48-5.01-1.57l1.04-4.88 3.38.72a1.54 1.54 0 1 0 .17-.88l-3.77-.8a.45.45 0 0 0-.53.35l-1.17 5.5c-1.95.07-3.71.65-5.1 1.56A2 2 0 0 0 5 10.04a2 2 0 0 0-2 2c0 .75.41 1.41 1.02 1.75-.03.18-.04.37-.04.56 0 2.84 3.59 5.14 8.02 5.14s8.02-2.3 8.02-5.14c0-.19-.01-.38-.04-.56.6-.35 1.02-1 1.02-1.75ZM8.5 13.5a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5Zm7.01 3.45c-.83.83-2.14 1.23-3.51 1.23s-2.68-.4-3.51-1.23a.45.45 0 0 1 .64-.64c.57.57 1.56.96 2.87.96s2.3-.39 2.87-.96a.45.45 0 1 1 .64.64Zm-.01-3.45a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5Z" />
+                </svg>
+              </a>
+
+            </div>
+
           </div>
 
           <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-slate-600">
@@ -2013,7 +2078,7 @@ export default function Home() {
             </a>
 
             <a
-              href="#coming-soon"
+              href="/terms"
               className="hover:text-[#d94d28]"
             >
               Terms
