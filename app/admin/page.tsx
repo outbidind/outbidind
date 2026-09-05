@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
@@ -7,6 +8,15 @@ import ApproveButton from "./ApproveButton";
 import RejectButton from "./RejectButton";
 import StartAuctionButton from "./StartAuctionButton";
 import PanelMobileMenu from "@/components/PanelMobileMenu";
+export const metadata: Metadata = {
+  title: "Admin Dashboard | OutbidInd",
+  description:
+    "Private OutbidInd administration dashboard for authorized marketplace management.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 type Listing = {
   id: string;

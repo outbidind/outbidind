@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -6,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import BidSection from "@/components/BidSection";
 import CompletePaymentButton from "@/components/CompletePaymentButton";
 import TrackedWebsiteLink from "@/components/TrackedWebsiteLink";
+import { getBusinessPath } from "@/lib/business-url";
 
 type PageProps = {
   params: Promise<{
@@ -34,6 +36,126 @@ type Bid = {
   amount: number;
   created_at: string;
 };
+
+async function getPublicBusinessListing(
+  id: string
+): Promise<BusinessListing | null> {
+  // A business detail route should contain a UUID.
+  // If the URL is invalid, do not call the database and
+  // do not create a noisy server-console error.
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  if (!uuidPattern.test(id)) {
+    return null;
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: listingData,
+    error: listingError,
+  } = await supabase.rpc(
+    "get_public_business_listing",
+    {
+      p_listing_id: id,
+    }
+  );
+
+  // A missing/unavailable public listing is an expected
+  // condition for metadata generation. The actual page
+  // will handle it with notFound().
+  if (listingError) {
+    return null;
+  }
+
+  const listingRows =
+    (listingData ?? []) as BusinessListing[];
+
+  return Array.isArray(listingRows)
+    ? listingRows[0] ?? null
+    : null;
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { id } = await params;
+
+  const listing =
+    await getPublicBusinessListing(id);
+
+  if (!listing) {
+    return {
+      title: "Business Auction | OutbidInd",
+      description:
+        "Explore approved businesses and live bidding opportunities on the OutbidInd marketplace.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const businessName =
+    listing.business_name.trim();
+
+  const category =
+    listing.category.trim();
+
+  const location =
+    listing.location.trim();
+
+  const description =
+    listing.description.trim();
+
+  const seoDescription =
+    `${businessName} ${category ? `business auction in ${category}` : "business auction"}${location ? `, ${location}` : ""}. Explore business details and participate in live bidding on OutbidInd.`;
+
+  const finalDescription =
+    description.length > 0
+      ? `${description.slice(0, 145).trim()}${description.length > 145 ? "…" : ""} Participate in live bidding on OutbidInd.`
+      : seoDescription;
+
+  const businessPath = getBusinessPath(
+    businessName,
+    id
+  );
+
+  return {
+    title: `${businessName}${category ? ` – ${category}` : ""}${location ? ` in ${location}` : ""} | OutbidInd`,
+    description: finalDescription,
+    alternates: {
+      canonical: businessPath,
+    },
+    openGraph: {
+      type: "website",
+      url: businessPath,
+      siteName: "OutbidInd",
+      title: `${businessName}${category ? ` – ${category}` : ""}${location ? ` in ${location}` : ""} | OutbidInd`,
+      description: finalDescription,
+      locale: "en_IN",
+      images: [
+        {
+          url: "/logo.png",
+          width: 512,
+          height: 512,
+          alt: "OutbidInd – Business Auction & Bidding Marketplace",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary",
+      title: `${businessName}${category ? ` – ${category}` : ""}${location ? ` in ${location}` : ""} | OutbidInd`,
+      description: finalDescription,
+      images: ["/logo.png"],
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
+}
 
 function formatMoney(
   value:
@@ -76,6 +198,13 @@ export default async function BusinessPage({
   params,
 }: PageProps) {
   const { id } = await params;
+
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  if (!uuidPattern.test(id)) {
+    notFound();
+  }
 
   const supabase =
     await createClient();
@@ -204,11 +333,74 @@ export default async function BusinessPage({
     );
 
   // =====================================================
+  // SEO STRUCTURED DATA
+  // =====================================================
+
+  const businessPageUrl =
+    `https://outbidind.com${getBusinessPath(
+      listing.business_name,
+      listing.id
+    )}`;
+
+  const businessPageSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: `${listing.business_name} | OutbidInd`,
+    description:
+      listing.description?.trim() ||
+      `Explore ${listing.business_name} on OutbidInd and participate in live business bidding.`,
+    url: businessPageUrl,
+    isPartOf: {
+      "@type": "WebSite",
+      name: "OutbidInd",
+      url: "https://outbidind.com",
+    },
+    about: {
+      "@type": "Thing",
+      name: listing.business_name,
+      description:
+        listing.description?.trim() ||
+        `Business listing for ${listing.business_name}.`,
+    },
+    breadcrumb: {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://outbidind.com",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Live Bids",
+          item: "https://outbidind.com/live-bids",
+        },
+        {
+          "@type": "ListItem",
+          position: 3,
+          name: listing.business_name,
+          item: businessPageUrl,
+        },
+      ],
+    },
+  };
+
+  // =====================================================
   // PAGE
   // =====================================================
 
   return (
     <main className="min-h-screen bg-[#f6f7f5] text-slate-900">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            businessPageSchema
+          ),
+        }}
+      />
 
       {/* =================================================
           HEADER
@@ -228,7 +420,7 @@ export default async function BusinessPage({
             </span>
 
             <span className="text-lg font-bold tracking-tight text-slate-950">
-              OutbidInd
+              Outbid<span className="text-[#e4572e]">Ind</span>
             </span>
           </Link>
 
@@ -261,6 +453,15 @@ export default async function BusinessPage({
             className="transition hover:text-[#e4572e]"
           >
             Marketplace
+          </Link>
+
+          <span>/</span>
+
+          <Link
+            href="/live-bids"
+            className="transition hover:text-[#e4572e]"
+          >
+            Live Bids
           </Link>
 
           <span>/</span>
@@ -336,10 +537,12 @@ export default async function BusinessPage({
                   </p>
 
                   <div className="mt-6 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+
                     <div className="rounded-xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
                       <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                         Starting Bid
                       </p>
+
                       <p className="mt-1 text-lg font-black text-slate-950">
                         {formatMoney(listing.starting_bid)}
                       </p>
@@ -349,6 +552,7 @@ export default async function BusinessPage({
                       <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                         Current Bid
                       </p>
+
                       <p className="mt-1 text-lg font-black text-[#d94d28]">
                         {formatMoney(initialCurrentBid)}
                       </p>
@@ -358,10 +562,12 @@ export default async function BusinessPage({
                       <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                         Status
                       </p>
+
                       <p className="mt-1 text-lg font-black uppercase text-slate-950">
                         {listing.listing_status}
                       </p>
                     </div>
+
                   </div>
 
                 </div>
@@ -372,9 +578,9 @@ export default async function BusinessPage({
               <div className="p-7 sm:p-10">
 
                 <div>
-                  <p className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
-                    About the business
-                  </p>
+                  <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
+                    About {listing.business_name}
+                  </h2>
 
                   <p className="mt-4 whitespace-pre-line text-base leading-8 text-slate-600">
                     {listing.description}
@@ -383,24 +589,26 @@ export default async function BusinessPage({
 
                 {listing.additional_information && (
                   <div className="mt-8 border-t border-slate-100 pt-8">
-                    <p className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
-                      Additional information
-                    </p>
+
+                    <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
+                      Additional Information
+                    </h2>
 
                     <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600">
                       {
                         listing.additional_information
                       }
                     </p>
+
                   </div>
                 )}
 
                 {website && (
                   <div className="mt-8 border-t border-slate-100 pt-8">
 
-                    <p className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
-                      Official website
-                    </p>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-[#d94d28]">
+                      Official Website
+                    </h2>
 
                     <TrackedWebsiteLink
                       href={website}
@@ -426,9 +634,9 @@ export default async function BusinessPage({
               <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5 sm:px-7">
 
                 <div>
-                  <p className="font-bold text-slate-950">
-                    Bid History
-                  </p>
+                  <h2 className="font-bold text-slate-950">
+                    Bid History & Auction Activity
+                  </h2>
 
                   <p className="mt-1 text-xs text-slate-400">
                     {bidHistory.length}{" "}
@@ -507,6 +715,7 @@ export default async function BusinessPage({
                               </p>
 
                             </div>
+
                           </div>
 
                           {index === 0 && (
@@ -528,6 +737,7 @@ export default async function BusinessPage({
                     <details className="border-t border-slate-100">
 
                       <summary className="cursor-pointer list-none px-6 py-4 text-center text-sm font-bold text-[#e4572e] transition hover:bg-orange-50 sm:px-7">
+
                         <span>
                           View Full Bid History
                         </span>
@@ -539,6 +749,7 @@ export default async function BusinessPage({
                           }{" "}
                           more
                         </span>
+
                       </summary>
 
                       <div className="divide-y divide-slate-100 border-t border-slate-100">
@@ -548,6 +759,7 @@ export default async function BusinessPage({
                             bid,
                             remainingIndex
                           ) => {
+
                             const actualIndex =
                               visibleBidCount +
                               remainingIndex;
@@ -598,6 +810,7 @@ export default async function BusinessPage({
               )}
 
             </div>
+
           </div>
 
           {/* =================================================
@@ -611,6 +824,10 @@ export default async function BusinessPage({
               {/* AUCTION TOTAL */}
 
               <div className="bg-[#102a43] p-7 text-white sm:p-8">
+
+                <h2 className="sr-only">
+                  Live Business Bidding
+                </h2>
 
                 <div className="flex items-center justify-between gap-4">
 
@@ -682,6 +899,7 @@ export default async function BusinessPage({
               {/* BID / PAYMENT ACTION */}
 
               <div className="p-7 sm:p-8">
+
                 {listing.listing_status ===
                   "live" ? (
                   <BidSection
@@ -711,9 +929,11 @@ export default async function BusinessPage({
                     }
                   />
                 )}
+
               </div>
 
             </div>
+
           </aside>
 
         </div>
@@ -731,7 +951,7 @@ export default async function BusinessPage({
             href="/"
             className="font-bold text-slate-950"
           >
-            OutbidInd
+            Outbid<span className="text-[#e4572e]">Ind</span>
           </Link>
 
           <p className="text-sm text-slate-400">

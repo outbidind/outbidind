@@ -6,6 +6,7 @@ import Modal from "@/components/Modal";
 import { LoginForm, SignupForm } from "@/components/ModalForms";
 import { BusinessListingForm } from "@/components/BusinessListingForm";
 import { createClient } from "@/lib/supabase/client";
+import { getBusinessPath } from "@/lib/business-url";
 
 type ModalName = "login" | "signup" | "listing" | "bid" | null;
 
@@ -442,8 +443,24 @@ export default function Home() {
 
   /* ================= UI ================= */
 
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "OutbidInd",
+    url: "https://outbidind.com",
+    description:
+      "Business auction and real-time bidding marketplace in India.",
+    inLanguage: "en-IN",
+  };
+
   return (
     <main className="overflow-hidden bg-[#f6f7f5] text-slate-900">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(websiteSchema),
+        }}
+      />
 
       {/* ================= HEADER ================= */}
 
@@ -485,14 +502,7 @@ export default function Home() {
 
               <a
                 className="transition hover:text-[#d94d28]"
-                href="#explore"
-              >
-                Explore
-              </a>
-
-              <a
-                className="transition hover:text-[#d94d28]"
-                href="#live-bids"
+                href="/live-bids"
               >
                 Live Bids
               </a>
@@ -621,17 +631,7 @@ export default function Home() {
               <div className="flex flex-col gap-1 text-sm font-semibold text-slate-700">
 
                 <a
-                  href="#explore"
-                  onClick={() =>
-                    setMobileMenuOpen(false)
-                  }
-                  className="rounded-lg px-4 py-3 transition hover:bg-orange-50 hover:text-[#d94d28]"
-                >
-                  Explore
-                </a>
-
-                <a
-                  href="#live-bids"
+                  href="/live-bids"
                   onClick={() =>
                     setMobileMenuOpen(false)
                   }
@@ -768,14 +768,14 @@ export default function Home() {
             <br />
 
             <span className="text-[#e4572e]">
-              Bid. Compete.
+              Bid in real time.
             </span>
           </h1>
 
           <p className="mt-7 max-w-xl text-lg leading-8 text-slate-600">
-            Explore approved businesses across India and
-            take part in a transparent, continuous bidding
-            marketplace built for serious opportunities.
+            Explore approved businesses across India and participate
+            in real-time business auctions and competitive bidding
+            on the OutbidInd marketplace.
           </p>
 
           {/* ================= HERO CTA ================= */}
@@ -793,6 +793,13 @@ export default function Home() {
             </button>
 
           </div>
+
+          <a
+            href="/list-your-business"
+            className="mt-4 inline-flex text-sm font-bold text-slate-700 underline decoration-orange-300 underline-offset-4 transition hover:text-[#d94d28]"
+          >
+            Submit your business for auction →
+          </a>
 
           <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5 text-sm text-slate-500">
 
@@ -1008,7 +1015,7 @@ export default function Home() {
                     >
 
                       <a
-                        href={`/business/${business.id}`}
+                        href={getBusinessPath(business.business_name, business.id)}
                         onClick={() =>
                           trackBusinessClick(
                             business.id,
@@ -1079,6 +1086,15 @@ export default function Home() {
 
             </div>
 
+            <div className="mt-4 text-right">
+              <a
+                href="/live-bids"
+                className="text-sm font-bold text-[#d94d28] transition hover:text-[#b83f21]"
+              >
+                View all live business auctions →
+              </a>
+            </div>
+
           </div>
 
         </div>
@@ -1103,12 +1119,12 @@ export default function Home() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-                All Live Bids
+                Live Business Auctions & Bids
               </h2>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                Live auctions ranked from the highest current bid to the lowest.
-                Search any business to find its current marketplace position.
+                Explore live business auctions ranked by current auction total.
+                Search for a business to view its listing and bidding activity.
               </p>
 
             </div>
@@ -1291,7 +1307,7 @@ export default function Home() {
                               <td className="px-5 py-5">
 
                                 <a
-                                  href={`/business/${business.id}`}
+                                  href={getBusinessPath(business.business_name, business.id)}
                                   onClick={() =>
                                     trackBusinessClick(
                                       business.id,
@@ -1419,7 +1435,7 @@ export default function Home() {
                             </div>
 
                             <a
-                              href={`/business/${business.id}`}
+                              href={getBusinessPath(business.business_name, business.id)}
                               onClick={() =>
                                 trackBusinessClick(
                                   business.id,
@@ -1519,245 +1535,6 @@ export default function Home() {
 
       </section>
 
-      {/* ================= EXPLORE ================= */}
-
-      <section
-        id="explore"
-        className="hidden border-y border-slate-200 bg-white"
-      >
-
-        <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8">
-
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-
-            <div>
-
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#d94d28]">
-                Explore the marketplace
-              </p>
-
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-                Businesses worth looking closer at.
-              </h2>
-
-            </div>
-
-            <p className="max-w-sm text-sm leading-6 text-slate-500">
-              Only approved businesses are displayed here.
-              New listings appear after admin review.
-            </p>
-
-          </div>
-
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
-
-            {businessesLoading && (
-              <div className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-10 text-center">
-
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#e4572e]" />
-
-                <p className="mt-4 text-sm font-semibold text-slate-500">
-                  Loading approved businesses...
-                </p>
-
-              </div>
-            )}
-
-            {!businessesLoading &&
-              businessesError && (
-                <div className="lg:col-span-3 rounded-2xl border border-red-200 bg-red-50 p-10 text-center">
-
-                  <p className="text-sm font-semibold text-red-700">
-                    {businessesError}
-                  </p>
-
-                </div>
-              )}
-
-            {!businessesLoading &&
-              !businessesError &&
-              approvedBusinesses.length === 0 && (
-                <div className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-10 text-center">
-
-                  <p className="text-lg font-bold text-slate-950">
-                    No approved businesses yet.
-                  </p>
-
-                  <p className="mt-2 text-sm text-slate-500">
-                    Approved businesses will appear here once
-                    they are available.
-                  </p>
-
-                </div>
-              )}
-
-            {!businessesLoading &&
-              !businessesError &&
-              approvedBusinesses.map(
-                (business) => {
-
-                  const initials =
-                    business.business_name
-                      .split(" ")
-                      .map(
-                        (word) => word[0]
-                      )
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase();
-
-                  const website =
-                    business.business_website
-                      ? business.business_website.startsWith(
-                          "http"
-                        )
-                        ? business.business_website
-                        : `https://${business.business_website}`
-                      : null;
-
-                  return (
-                    <article
-                      key={business.id}
-                      className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-xl"
-                    >
-
-                      <div className="flex h-40 items-end justify-between bg-orange-100 p-6">
-
-                        <span className="text-5xl font-black tracking-[-0.08em] text-slate-950/15">
-                          {initials}
-                        </span>
-
-                        <span
-                          className={
-                            business.listing_status ===
-                            "live"
-                              ? "rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
-                              : "rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700"
-                          }
-                        >
-                          {business.listing_status ===
-                          "live"
-                            ? "LIVE AUCTION"
-                            : "APPROVED"}
-                        </span>
-
-                      </div>
-
-                      <div className="p-6">
-
-                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#d94d28]">
-                          {business.category ??
-                            "Uncategorized"}
-                        </p>
-
-                        <a
-                          href={`/business/${business.id}`}
-                          className="mt-2 block text-xl font-bold text-slate-950 transition hover:text-[#d94d28]"
-                        >
-                          {business.business_name}
-                        </a>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                          {business.location ??
-                            "Location not provided"}
-                        </p>
-
-                        {business.description && (
-                          <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-500">
-                            {business.description}
-                          </p>
-                        )}
-
-                        <div className="mt-7 grid grid-cols-2 gap-4 border-t border-slate-100 pt-5">
-
-                          <div>
-
-                            <p className="text-xs text-slate-400">
-                              Starting bid
-                            </p>
-
-                            <p className="mt-1 font-bold text-slate-700">
-                              ₹
-                              {Number(
-                                business.starting_bid ?? 0
-                              ).toLocaleString(
-                                "en-IN"
-                              )}
-                            </p>
-
-                          </div>
-
-                          <div>
-
-                            <p className="text-xs text-slate-400">
-                              Current bid
-                            </p>
-
-                            <p className="mt-1 font-bold text-slate-950">
-                              ₹
-                              {Number(
-                                business.current_bid ?? 0
-                              ).toLocaleString(
-                                "en-IN"
-                              )}
-                            </p>
-
-                          </div>
-
-                        </div>
-
-                        <div className="mt-5 flex items-center justify-between gap-3">
-
-                          {website ? (
-                            <a
-                              href={website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() =>
-                                trackBusinessClick(
-                                  business.id,
-                                  "website"
-                                )
-                              }
-                              className="font-bold text-[#d94d28] transition hover:text-[#102a43]"
-                            >
-                              Visit Website{" "}
-                              <Arrow />
-                            </a>
-                          ) : (
-                            <span className="text-sm text-slate-400">
-                              Website unavailable
-                            </span>
-                          )}
-
-                          <a
-                            href={`/business/${business.id}`}
-                            onClick={() =>
-                              trackBusinessClick(
-                                business.id,
-                                "detail"
-                              )
-                            }
-                            className="rounded-lg bg-[#e4572e] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#c94724]"
-                          >
-                            Bid
-                          </a>
-
-                        </div>
-
-                      </div>
-
-                    </article>
-                  );
-                }
-              )}
-
-          </div>
-
-        </div>
-
-      </section>
-
       {/* ================= HOW IT WORKS ================= */}
 
       <section
@@ -1772,7 +1549,7 @@ export default function Home() {
           </p>
 
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-            From discovery to opportunity.
+            How Business Bidding Works on OutbidInd
           </h2>
 
         </div>
@@ -1783,22 +1560,22 @@ export default function Home() {
             [
               "01",
               "Discover",
-              "Find businesses available on OutbidInd.",
+              "Find approved businesses available on the OutbidInd marketplace.",
             ],
             [
               "02",
               "Review",
-              "Explore the business information and official website.",
+              "Explore business details, location, description and official website.",
             ],
             [
               "03",
               "Bid",
-              "Participate in continuous competitive bidding.",
+              "Participate in continuous competitive bidding on live listings.",
             ],
             [
               "04",
-              "Win",
-              "Become the successful bidder when the bidding process ends.",
+              "Track",
+              "Follow the live auction total and bidding activity as the marketplace updates.",
             ],
           ].map(
             ([number, title, copy]) => (
@@ -1840,14 +1617,13 @@ export default function Home() {
             </p>
 
             <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Trust should be part of the product.
+              Trusted Business Listings & Bidding
             </h2>
 
             <p className="mt-5 max-w-md leading-7 text-slate-300">
-              Business listings are reviewed before going live.
-              OutbidInd uses account-based access, with more
-              security and verification features added as the
-              platform evolves.
+              Business listings go through review and security checks before
+              becoming available on the marketplace. OutbidInd uses account-based
+              access and server-side payment verification for bidding.
             </p>
 
           </div>
@@ -1912,12 +1688,12 @@ export default function Home() {
             </p>
 
             <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Your business could be the next opportunity.
+              List Your Business on OutbidInd
             </h2>
 
             <p className="mt-4 max-w-xl leading-7 text-orange-50">
-              Submit your business for review. Approved listings
-              can become active on the OutbidInd marketplace.
+              Submit your business for review and, once approved and paid,
+              make it available for live bidding on the OutbidInd marketplace.
             </p>
 
             <button
@@ -2041,27 +1817,18 @@ export default function Home() {
           <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-slate-600">
 
             <a
-              href="#explore"
-              className="hover:text-[#d94d28]"
-            >
-              Explore
-            </a>
-
-            <a
-              href="#live-bids"
+              href="/live-bids"
               className="hover:text-[#d94d28]"
             >
               Live Bids
             </a>
 
-            <button
-              onClick={() =>
-                setActiveModal("listing")
-              }
+            <a
+              href="/list-your-business"
               className="hover:text-[#d94d28]"
             >
               List Your Business
-            </button>
+            </a>
 
             <a
               href="#how-it-works"

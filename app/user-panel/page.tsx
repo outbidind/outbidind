@@ -1,9 +1,19 @@
-﻿import { redirect } from "next/navigation";
+﻿import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import BidForm from "@/components/BidForm";
 import PanelMobileMenu from "@/components/PanelMobileMenu";
+export const metadata: Metadata = {
+  title: "My OutbidInd Dashboard",
+  description:
+    "Manage your OutbidInd business listings, payments, and bidding activity.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 type Business = {
   id: string;

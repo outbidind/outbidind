@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { getBusinessPath } from "@/lib/business-url";
 
 type LiveBusiness = {
   id: string;
@@ -277,6 +278,13 @@ export default function LiveBidsPage() {
             </a>
 
             <a
+              href="/list-your-business"
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              List Your Business
+            </a>
+
+            <a
               href="/"
               className="rounded-lg bg-[#e4572e] px-4 py-2 text-sm font-bold text-white hover:bg-[#c94724]"
             >
@@ -304,13 +312,29 @@ export default function LiveBidsPage() {
             <div>
 
               <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                Live Auctions
+                Live Business Auctions & Bids in India
               </h1>
 
               <p className="mt-3 max-w-2xl text-slate-600">
-                Explore every active auction. Businesses are ranked by their
-                current highest bid.
+                Explore live business auctions on OutbidInd, compare current
+                auction totals and discover businesses available for real-time
+                bidding across India.
               </p>
+
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold">
+                <a
+                  href="/"
+                  className="text-[#d94d28] transition hover:text-[#b83f21]"
+                >
+                  Back to OutbidInd marketplace →
+                </a>
+                <a
+                  href="/list-your-business"
+                  className="text-slate-700 underline decoration-orange-300 underline-offset-4 transition hover:text-[#d94d28]"
+                >
+                  List your business for auction →
+                </a>
+              </div>
 
             </div>
 
@@ -474,7 +498,7 @@ export default function LiveBidsPage() {
                             <td className="px-5 py-5">
 
                               <a
-                                href={`/business/${business.id}`}
+                                href={getBusinessPath(business.business_name, business.id)}
                                 onClick={() =>
                                   trackClick(
                                     business.id,
@@ -504,7 +528,7 @@ export default function LiveBidsPage() {
                             <td className="px-5 py-5">
 
                               <a
-                                href={`/business/${business.id}`}
+                                href={getBusinessPath(business.business_name, business.id)}
                                 onClick={() =>
                                   trackClick(
                                     business.id,
@@ -635,7 +659,7 @@ export default function LiveBidsPage() {
                       {/* Entire business area is clickable */}
 
                       <a
-                        href={`/business/${business.id}`}
+                        href={getBusinessPath(business.business_name, business.id)}
                         onClick={() =>
                           trackClick(
                             business.id,
@@ -787,6 +811,33 @@ export default function LiveBidsPage() {
                   You&apos;ve reached the end of the live auctions.
                 </p>
               )}
+
+            {/* ================= INTERNAL LINKS ================= */}
+
+            <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
+              <h2 className="text-xl font-black text-slate-950">
+                Explore OutbidInd
+              </h2>
+              <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                Browse the OutbidInd marketplace or submit a business to be
+                considered for a business auction and real-time bidding.
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <a
+                  href="/"
+                  className="rounded-xl bg-[#102a43] px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+                >
+                  Go to Marketplace
+                </a>
+                <a
+                  href="/list-your-business"
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-[#d94d28]"
+                >
+                  List Your Business
+                </a>
+              </div>
+            </div>
 
           </>
         )}

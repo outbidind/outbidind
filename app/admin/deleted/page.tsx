@@ -1,5 +1,15 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+export const metadata: Metadata = {
+  title: "Deleted Businesses | OutbidInd",
+  description:
+    "Private OutbidInd administration page for authorized review of deleted business records.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 type DeletedListing = {
   id: string;

@@ -1,36 +1,474 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
-type FormValues = { businessName: string; category: string; description: string; location: string; startingBid: string; website: string; additionalInformation: string };
+type FormValues = {
+  businessName: string;
+  category: string;
+  description: string;
+  location: string;
+  startingBid: string;
+  website: string;
+  additionalInformation: string;
+};
+
 type FormErrors = Partial<Record<keyof FormValues, string>>;
-const initialValues: FormValues = { businessName: "", category: "", description: "", location: "", startingBid: "", website: "", additionalInformation: "" };
-const categories = ["Restaurant", "Hotel", "Retail", "Manufacturing", "Healthcare", "Education", "Technology", "Service Business", "Other"];
+
+const initialValues: FormValues = {
+  businessName: "",
+  category: "",
+  description: "",
+  location: "",
+  startingBid: "",
+  website: "",
+  additionalInformation: "",
+};
+
+const categories = [
+  "Restaurant",
+  "Hotel",
+  "Retail",
+  "Manufacturing",
+  "Healthcare",
+  "Education",
+  "Technology",
+  "Service Business",
+  "Other",
+];
 
 function validate(values: FormValues): FormErrors {
   const errors: FormErrors = {};
-  if (!values.businessName.trim()) errors.businessName = "Enter your business name.";
-  if (!values.category) errors.category = "Select a business category.";
-  if (!values.description.trim()) errors.description = "Tell us a little about the business.";
-  if (values.description.length > 800) errors.description = "Keep the description under 800 characters.";
-  if (!values.location.trim()) errors.location = "Enter the business location.";
-  if (!values.startingBid || Number(values.startingBid) <= 0) errors.startingBid = "Enter a starting bid greater than zero.";
-  if (values.website.trim()) { try { const url = new URL(values.website); if (!/^https?:$/.test(url.protocol)) throw new Error("Invalid protocol"); } catch { errors.website = "Enter a valid website URL, including https://."; } }
-  if (values.additionalInformation.length > 1000) errors.additionalInformation = "Keep additional information under 1,000 characters.";
+
+  if (!values.businessName.trim()) {
+    errors.businessName = "Enter your business name.";
+  }
+
+  if (!values.category) {
+    errors.category = "Select a business category.";
+  }
+
+  if (!values.description.trim()) {
+    errors.description = "Tell us a little about the business.";
+  }
+
+  if (values.description.length > 800) {
+    errors.description = "Keep the description under 800 characters.";
+  }
+
+  if (!values.location.trim()) {
+    errors.location = "Enter the business location.";
+  }
+
+  if (!values.startingBid || Number(values.startingBid) <= 0) {
+    errors.startingBid = "Enter a starting bid greater than zero.";
+  }
+
+  if (values.website.trim()) {
+    try {
+      const url = new URL(values.website);
+
+      if (!/^https?:$/.test(url.protocol)) {
+        throw new Error("Invalid protocol");
+      }
+    } catch {
+      errors.website =
+        "Enter a valid website URL, including https://.";
+    }
+  }
+
+  if (values.additionalInformation.length > 1000) {
+    errors.additionalInformation =
+      "Keep additional information under 1,000 characters.";
+  }
+
   return errors;
 }
 
-function FieldError({ message }: { message?: string }) { return message ? <p className="mt-2 text-sm text-red-700">{message}</p> : null; }
-function FieldLabel({ htmlFor, children, optional = false }: { htmlFor: string; children: React.ReactNode; optional?: boolean }) { return <label htmlFor={htmlFor} className="mb-2 block text-sm font-semibold text-slate-800">{children} {!optional && <span className="text-red-600" aria-hidden="true">*</span>}{optional && <span className="ml-2 text-xs font-normal text-slate-500">Optional</span>}</label>; }
-const inputClasses = (hasError: boolean) => `w-full rounded-lg border bg-white px-4 py-3 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 ${hasError ? "border-red-400" : "border-slate-300"}`;
+function FieldError({ message }: { message?: string }) {
+  return message ? (
+    <p className="mt-2 text-sm text-red-700">{message}</p>
+  ) : null;
+}
+
+function FieldLabel({
+  htmlFor,
+  children,
+  optional = false,
+}: {
+  htmlFor: string;
+  children: React.ReactNode;
+  optional?: boolean;
+}) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className="mb-2 block text-sm font-semibold text-slate-800"
+    >
+      {children}{" "}
+      {!optional && (
+        <span className="text-red-600" aria-hidden="true">
+          *
+        </span>
+      )}
+      {optional && (
+        <span className="ml-2 text-xs font-normal text-slate-500">
+          Optional
+        </span>
+      )}
+    </label>
+  );
+}
+
+const inputClasses = (hasError: boolean) =>
+  `w-full rounded-lg border bg-white px-4 py-3 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 ${
+    hasError ? "border-red-400" : "border-slate-300"
+  }`;
 
 export default function ListYourBusiness() {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const updateField = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { const { name, value } = event.target; setValues((current) => ({ ...current, [name]: value })); setErrors((current) => ({ ...current, [name]: undefined })); setIsSubmitted(false); };
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const nextErrors = validate(values); setErrors(nextErrors); if (Object.keys(nextErrors).length > 0) return; setIsSubmitting(true); window.setTimeout(() => { setIsSubmitting(false); setIsSubmitted(true); }, 700); };
-  return <main className="min-h-screen bg-[#f5f7f9] text-slate-900"><header className="border-b border-slate-200/80 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8"><Link href="/" className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">O</span><span className="text-lg font-bold tracking-tight text-slate-950">OutbidInd</span></Link><span className="hidden text-sm font-medium text-slate-500 sm:block">Trusted business marketplace</span></div></header><div className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14"><div className="mb-10 max-w-2xl"><p className="mb-3 text-sm font-bold uppercase tracking-[0.18em] text-[#d94d28]">Business submission</p><h1 className="text-4xl font-bold tracking-[-0.03em] text-slate-950 sm:text-5xl">List Your Business</h1><p className="mt-4 max-w-xl text-lg leading-8 text-slate-600">Submit your business for review and make it available to qualified bidders.</p></div><form onSubmit={handleSubmit} noValidate className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-9"><section aria-labelledby="business-details-heading"><h2 id="business-details-heading" className="mb-6 text-xl font-bold text-slate-950">Business details</h2><div className="grid gap-5 sm:grid-cols-2"><div><FieldLabel htmlFor="businessName">Business Name</FieldLabel><input id="businessName" name="businessName" value={values.businessName} onChange={updateField} className={inputClasses(!!errors.businessName)} placeholder="e.g. The Curry House" aria-invalid={!!errors.businessName} /><FieldError message={errors.businessName} /></div><div><FieldLabel htmlFor="category">Business Category</FieldLabel><select id="category" name="category" value={values.category} onChange={updateField} className={inputClasses(!!errors.category)} aria-invalid={!!errors.category}><option value="">Select a category</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select><FieldError message={errors.category} /></div><div className="sm:col-span-2"><FieldLabel htmlFor="description">Business Description</FieldLabel><textarea id="description" name="description" value={values.description} onChange={updateField} maxLength={800} rows={5} className={inputClasses(!!errors.description)} placeholder="Describe what makes your business special, its history, and its current operations." aria-invalid={!!errors.description} /><div className="mt-2 flex justify-between gap-4"><FieldError message={errors.description} /><span className="ml-auto text-xs text-slate-400">{values.description.length}/800</span></div></div><div className="sm:col-span-2"><FieldLabel htmlFor="location">Business Location</FieldLabel><input id="location" name="location" value={values.location} onChange={updateField} className={inputClasses(!!errors.location)} placeholder="City, state, or full business address" aria-invalid={!!errors.location} /><FieldError message={errors.location} /></div><div><FieldLabel htmlFor="startingBid">Starting Bid</FieldLabel><div className="relative"><span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-500">₹</span><input id="startingBid" name="startingBid" type="number" min="1" step="1" value={values.startingBid} onChange={updateField} className={`${inputClasses(!!errors.startingBid)} pl-9`} placeholder="0" aria-describedby="bid-help" aria-invalid={!!errors.startingBid} /></div><p id="bid-help" className="mt-2 text-xs text-slate-500">Enter the minimum amount in Indian Rupees.</p><FieldError message={errors.startingBid} /></div></div></section><div className="my-9 border-t border-slate-200" /><section aria-labelledby="supporting-heading"><h2 id="supporting-heading" className="mb-6 text-xl font-bold text-slate-950">Listing information</h2><div className="grid gap-5"><div><FieldLabel htmlFor="website" optional>Business Website</FieldLabel><input id="website" name="website" type="url" value={values.website} onChange={updateField} className={inputClasses(!!errors.website)} placeholder="https://yourbusiness.com" aria-invalid={!!errors.website} /><p className="mt-2 text-xs text-slate-500">This link can be shown to bidders after approval.</p><FieldError message={errors.website} /></div><div><FieldLabel htmlFor="additionalInformation" optional>Additional Information</FieldLabel><textarea id="additionalInformation" name="additionalInformation" value={values.additionalInformation} onChange={updateField} maxLength={1000} rows={4} className={inputClasses(!!errors.additionalInformation)} placeholder="Anything else you would like our review team to know?" aria-invalid={!!errors.additionalInformation} /><div className="mt-2 flex justify-between"><FieldError message={errors.additionalInformation} /><span className="ml-auto text-xs text-slate-400">{values.additionalInformation.length}/1000</span></div></div></div></section><div className="mt-9 border-t border-slate-200 pt-6">{isSubmitted && <div role="status" className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">Your business details are ready for review. We will be in touch soon.</div>}{Object.keys(errors).length > 0 && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">Please review the highlighted fields before submitting.</div>}<div className="flex flex-col-reverse items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs leading-5 text-slate-500">By submitting, you confirm that the information provided is accurate.</p><button type="submit" disabled={isSubmitting} className="rounded-lg bg-[#e4572e] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 disabled:cursor-wait disabled:opacity-70">{isSubmitting ? "Submitting..." : "Submit Business"}</button></div></div></form></div></main>;
+
+  const updateField = (
+    event: ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    const { name, value } = event.target;
+
+    setValues((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
+    setErrors((current) => ({
+      ...current,
+      [name]: undefined,
+    }));
+
+    setIsSubmitted(false);
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const nextErrors = validate(values);
+
+    setErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    window.setTimeout(() => {
+      setIsSubmitting(false);
+      setIsSubmitted(true);
+    }, 700);
+  };
+
+  return (
+    <main className="min-h-screen bg-[#f5f7f9] text-slate-900">
+      {/* ================= HEADER ================= */}
+      <header className="border-b border-slate-200/80 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
+          <Link
+            href="/"
+            className="flex items-center gap-3"
+            aria-label="OutbidInd Home"
+          >
+            <Image
+              src="/logo.png"
+              alt="OutbidInd"
+              width={44}
+              height={44}
+              className="h-11 w-11 object-contain"
+              priority
+            />
+
+            <span className="text-xl font-bold tracking-tight text-slate-950">
+              Outbid<span className="text-[#e4572e]">Ind</span>
+            </span>
+          </Link>
+
+          <span className="hidden text-sm font-medium text-slate-500 sm:block">
+            Trusted business marketplace
+          </span>
+        </div>
+      </header>
+
+      {/* ================= CONTENT ================= */}
+      <div className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
+        <div className="mb-10 max-w-2xl">
+          <p className="mb-3 text-sm font-bold uppercase tracking-[0.18em] text-[#d94d28]">
+            Business submission
+          </p>
+
+          <h1 className="text-4xl font-bold tracking-[-0.03em] text-slate-950 sm:text-5xl">
+            List Your Business for Auction in India
+          </h1>
+
+          <p className="mt-4 max-w-xl text-lg leading-8 text-slate-600">
+            Submit your business for review and make it available for
+            real-time business auctions and competitive bidding on
+            OutbidInd.
+          </p>
+        </div>
+
+        {/* ================= FORM ================= */}
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] sm:p-9"
+        >
+          {/* ================= BUSINESS DETAILS ================= */}
+          <section aria-labelledby="business-details-heading">
+            <h2
+              id="business-details-heading"
+              className="mb-6 text-xl font-bold text-slate-950"
+            >
+              Business details
+            </h2>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <FieldLabel htmlFor="businessName">
+                  Business Name
+                </FieldLabel>
+
+                <input
+                  id="businessName"
+                  name="businessName"
+                  value={values.businessName}
+                  onChange={updateField}
+                  className={inputClasses(!!errors.businessName)}
+                  placeholder="e.g. The Curry House"
+                  aria-invalid={!!errors.businessName}
+                />
+
+                <FieldError message={errors.businessName} />
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="category">
+                  Business Category
+                </FieldLabel>
+
+                <select
+                  id="category"
+                  name="category"
+                  value={values.category}
+                  onChange={updateField}
+                  className={inputClasses(!!errors.category)}
+                  aria-invalid={!!errors.category}
+                >
+                  <option value="">Select a category</option>
+
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+
+                <FieldError message={errors.category} />
+              </div>
+
+              <div className="sm:col-span-2">
+                <FieldLabel htmlFor="description">
+                  Business Description
+                </FieldLabel>
+
+                <textarea
+                  id="description"
+                  name="description"
+                  value={values.description}
+                  onChange={updateField}
+                  maxLength={800}
+                  rows={5}
+                  className={inputClasses(!!errors.description)}
+                  placeholder="Describe what makes your business special, its history, and its current operations."
+                  aria-invalid={!!errors.description}
+                />
+
+                <div className="mt-2 flex justify-between gap-4">
+                  <FieldError message={errors.description} />
+
+                  <span className="ml-auto text-xs text-slate-400">
+                    {values.description.length}/800
+                  </span>
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <FieldLabel htmlFor="location">
+                  Business Location
+                </FieldLabel>
+
+                <input
+                  id="location"
+                  name="location"
+                  value={values.location}
+                  onChange={updateField}
+                  className={inputClasses(!!errors.location)}
+                  placeholder="City, state, or full business address"
+                  aria-invalid={!!errors.location}
+                />
+
+                <FieldError message={errors.location} />
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="startingBid">
+                  Starting Bid
+                </FieldLabel>
+
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-500">
+                    ₹
+                  </span>
+
+                  <input
+                    id="startingBid"
+                    name="startingBid"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={values.startingBid}
+                    onChange={updateField}
+                    className={`${inputClasses(
+                      !!errors.startingBid
+                    )} pl-9`}
+                    placeholder="0"
+                    aria-describedby="bid-help"
+                    aria-invalid={!!errors.startingBid}
+                  />
+                </div>
+
+                <p
+                  id="bid-help"
+                  className="mt-2 text-xs text-slate-500"
+                >
+                  Enter the minimum amount in Indian Rupees.
+                </p>
+
+                <FieldError message={errors.startingBid} />
+              </div>
+            </div>
+          </section>
+
+          <div className="my-9 border-t border-slate-200" />
+
+          {/* ================= LISTING INFORMATION ================= */}
+          <section aria-labelledby="supporting-heading">
+            <h2
+              id="supporting-heading"
+              className="mb-6 text-xl font-bold text-slate-950"
+            >
+              Listing information
+            </h2>
+
+            <div className="grid gap-5">
+              <div>
+                <FieldLabel htmlFor="website" optional>
+                  Business Website
+                </FieldLabel>
+
+                <input
+                  id="website"
+                  name="website"
+                  type="url"
+                  value={values.website}
+                  onChange={updateField}
+                  className={inputClasses(!!errors.website)}
+                  placeholder="https://yourbusiness.com"
+                  aria-invalid={!!errors.website}
+                />
+
+                <p className="mt-2 text-xs text-slate-500">
+                  This link can be shown to bidders after approval.
+                </p>
+
+                <FieldError message={errors.website} />
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="additionalInformation" optional>
+                  Additional Information
+                </FieldLabel>
+
+                <textarea
+                  id="additionalInformation"
+                  name="additionalInformation"
+                  value={values.additionalInformation}
+                  onChange={updateField}
+                  maxLength={1000}
+                  rows={4}
+                  className={inputClasses(
+                    !!errors.additionalInformation
+                  )}
+                  placeholder="Anything else you would like our review team to know?"
+                  aria-invalid={!!errors.additionalInformation}
+                />
+
+                <div className="mt-2 flex justify-between">
+                  <FieldError
+                    message={errors.additionalInformation}
+                  />
+
+                  <span className="ml-auto text-xs text-slate-400">
+                    {values.additionalInformation.length}/1000
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ================= SUBMIT ================= */}
+          <div className="mt-9 border-t border-slate-200 pt-6">
+            {isSubmitted && (
+              <div
+                role="status"
+                className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+              >
+                Your business details are ready for review. We
+                will be in touch soon.
+              </div>
+            )}
+
+            {Object.keys(errors).length > 0 && (
+              <div
+                role="alert"
+                className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
+              >
+                Please review the highlighted fields before
+                submitting.
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-5 text-slate-500">
+                By submitting, you confirm that the information
+                provided is accurate.
+              </p>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="rounded-lg bg-[#e4572e] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 disabled:cursor-wait disabled:opacity-70"
+              >
+                {isSubmitting
+                  ? "Submitting..."
+                  : "Submit Business"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </main>
+  );
 }
