@@ -19,7 +19,10 @@ export default function TermsPage() {
             />
 
             <span className="text-xl font-bold tracking-tight text-slate-950">
-              OutbidInd
+              Outbid
+              <span className="text-[#e4572e]">
+                Ind
+              </span>
             </span>
           </Link>
 

@@ -502,7 +502,7 @@ export default function Home() {
 
               <a
                 className="transition hover:text-[#d94d28]"
-                href="/live-bids"
+                href="#live-bids"
               >
                 Live Bids
               </a>
@@ -631,7 +631,7 @@ export default function Home() {
               <div className="flex flex-col gap-1 text-sm font-semibold text-slate-700">
 
                 <a
-                  href="/live-bids"
+                  href="#live-bids"
                   onClick={() =>
                     setMobileMenuOpen(false)
                   }
@@ -793,13 +793,6 @@ export default function Home() {
             </button>
 
           </div>
-
-          <a
-            href="/list-your-business"
-            className="mt-4 inline-flex text-sm font-bold text-slate-700 underline decoration-orange-300 underline-offset-4 transition hover:text-[#d94d28]"
-          >
-            Submit your business for auction →
-          </a>
 
           <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5 text-sm text-slate-500">
 
@@ -1084,15 +1077,6 @@ export default function Home() {
 
               )}
 
-            </div>
-
-            <div className="mt-4 text-right">
-              <a
-                href="/live-bids"
-                className="text-sm font-bold text-[#d94d28] transition hover:text-[#b83f21]"
-              >
-                View all live business auctions →
-              </a>
             </div>
 
           </div>
@@ -1817,18 +1801,20 @@ export default function Home() {
           <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-slate-600">
 
             <a
-              href="/live-bids"
+              href="#live-bids"
               className="hover:text-[#d94d28]"
             >
               Live Bids
             </a>
 
-            <a
-              href="/list-your-business"
+            <button
+              onClick={() =>
+                setActiveModal("listing")
+              }
               className="hover:text-[#d94d28]"
             >
               List Your Business
-            </a>
+            </button>
 
             <a
               href="#how-it-works"
@@ -1838,7 +1824,7 @@ export default function Home() {
             </a>
 
             <a
-              href="#coming-soon"
+              href="/privacy"
               className="hover:text-[#d94d28]"
             >
               Privacy
