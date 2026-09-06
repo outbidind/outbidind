@@ -61,6 +61,70 @@ function AuthField({
   );
 }
 
+function GoogleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path
+        fill="#4285F4"
+        d="M21.35 12.23c0-.79-.07-1.55-.23-2.27H12v4.3h5.23a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.92-4.18 2.92-7.42Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 21.65c2.63 0 4.84-.87 6.45-2.36l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.75 9.75 0 0 0 12 21.65Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.54 13.73A5.86 5.86 0 0 1 6.23 12c0-.6.11-1.19.31-1.73V7.74H3.3A9.76 9.76 0 0 0 2.25 12c0 1.57.38 3.05 1.05 4.26l3.24-2.53Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 6.24c1.43 0 2.72.49 3.73 1.45l2.8-2.8C16.84 3.31 14.63 2.35 12 2.35A9.75 9.75 0 0 0 3.3 7.74l3.24 2.53C7.31 7.96 9.46 6.24 12 6.24Z"
+      />
+    </svg>
+  );
+}
+
+function GoogleButton({
+  disabled,
+  onError,
+}: {
+  disabled: boolean;
+  onError: (message: string) => void;
+}) {
+  const handleGoogleLogin = async () => {
+    onError("");
+
+    const supabase = createClient();
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      onError(error.message);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={handleGoogleLogin}
+      className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-orange-100 disabled:cursor-wait disabled:opacity-70"
+    >
+      <GoogleIcon />
+      Continue with Google
+    </button>
+  );
+}
+
 export function LoginForm({
   onSignup,
   onSuccess,
@@ -127,6 +191,23 @@ export function LoginForm({
       >
         {isSubmitting ? "Logging in..." : "Login"}
       </button>
+
+      <div className="relative py-1">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-slate-200" />
+        </div>
+
+        <div className="relative flex justify-center">
+          <span className="bg-white px-3 text-xs font-medium text-slate-400">
+            OR
+          </span>
+        </div>
+      </div>
+
+      <GoogleButton
+        disabled={isSubmitting}
+        onError={setError}
+      />
 
       <p className="text-center text-sm text-slate-500">
         Don&apos;t have an account?{" "}
@@ -242,6 +323,23 @@ export function SignupForm({
       >
         {isSubmitting ? "Creating account..." : "Sign up"}
       </button>
+
+      <div className="relative py-1">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-slate-200" />
+        </div>
+
+        <div className="relative flex justify-center">
+          <span className="bg-white px-3 text-xs font-medium text-slate-400">
+            OR
+          </span>
+        </div>
+      </div>
+
+      <GoogleButton
+        disabled={isSubmitting}
+        onError={setError}
+      />
 
       <p className="text-center text-sm text-slate-500">
         Already have an account?{" "}
