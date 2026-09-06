@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import TermsAcceptanceModal from "@/components/TermsAcceptanceModal";
 import PagePreloader from "@/components/PagePreloader";
+import PendingEmailWatcher from "@/components/PendingEmailWatcher";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -95,6 +96,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <PagePreloader />
+        <PendingEmailWatcher />
         {children}
         <TermsAcceptanceModal />
       </body>

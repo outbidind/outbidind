@@ -51,7 +51,8 @@ export async function POST(request: Request) {
         {
           success: false,
           sent: false,
-          error: "Your account does not have an email address.",
+          error:
+            "Your account does not have an email address.",
         },
         { status: 400 }
       );
@@ -83,7 +84,8 @@ export async function POST(request: Request) {
         {
           success: false,
           sent: false,
-          error: "Unable to check the business listing.",
+          error:
+            "Unable to check the business listing.",
         },
         { status: 500 }
       );
@@ -101,15 +103,33 @@ export async function POST(request: Request) {
     }
 
     /*
-     * If the listing is already live, the payment has
-     * completed and the existing LIVE email flow handles
-     * the live notification.
+     * IMPORTANT:
+     *
+     * Never send a pending email for a LIVE listing.
+     *
+     * The LIVE email flow is completely separate and
+     * remains untouched.
      */
     if (listing.listing_status === "live") {
       return NextResponse.json({
         success: true,
         sent: false,
         reason: "listing_live",
+      });
+    }
+
+    /*
+     * A pending-payment email is only relevant while the
+     * listing is approved and waiting for payment.
+     *
+     * Do not send pending emails for rejected, closed,
+     * draft, or any other listing state.
+     */
+    if (listing.listing_status !== "approved") {
+      return NextResponse.json({
+        success: true,
+        sent: false,
+        reason: "listing_not_awaiting_payment",
       });
     }
 
@@ -147,6 +167,7 @@ export async function POST(request: Request) {
 
     /*
      * Payment is already paid.
+     *
      * Do NOT send the pending email.
      */
     if (paidPayment) {
@@ -158,8 +179,15 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Payment is still incomplete.
-     * Send the pending business email.
+     * At this point:
+     *
+     * - User is authenticated
+     * - Listing belongs to the user
+     * - Listing is approved
+     * - Listing is NOT live
+     * - Payment has NOT been completed
+     *
+     * Therefore the pending payment email can be sent.
      */
     try {
       await sendPendingBusinessEmail({
@@ -183,7 +211,8 @@ export async function POST(request: Request) {
         {
           success: false,
           sent: false,
-          error: "Unable to send pending business email.",
+          error:
+            "Unable to send pending business email.",
         },
         { status: 500 }
       );

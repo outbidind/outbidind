@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 type PaymentPageProps = {
   listingId: string;
@@ -23,7 +23,9 @@ type RazorpayOptions = {
   description: string;
   order_id: string;
 
-  handler: (response: RazorpayResponse) => void;
+  handler: (
+    response: RazorpayResponse
+  ) => void;
 
   theme?: {
     color: string;
@@ -65,13 +67,16 @@ type RazorpayInstance = {
 
   on?: (
     event: string,
-    callback: (response: unknown) => void
+    callback: (
+      response: unknown
+    ) => void
   ) => void;
 };
 
-type RazorpayConstructor = new (
-  options: RazorpayOptions
-) => RazorpayInstance;
+type RazorpayConstructor =
+  new (
+    options: RazorpayOptions
+  ) => RazorpayInstance;
 
 declare global {
   interface Window {
@@ -85,384 +90,382 @@ export default function PaymentPage({
   bidAmount,
   onBack,
 }: PaymentPageProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [paymentMessage, setPaymentMessage] = useState("");
-  const [paymentError, setPaymentError] = useState("");
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(false);
 
-  const paymentCompletedRef = useRef(false);
-  const pendingEmailTimerRef = useRef<number | null>(null);
+  const [
+    paymentMessage,
+    setPaymentMessage,
+  ] = useState("");
+
+  const [
+    paymentError,
+    setPaymentError,
+  ] = useState("");
 
   /*
-   * =========================================================
-   * DELAYED PENDING PAYMENT EMAIL
-   * =========================================================
-   *
-   * Start the 90-second countdown when the payment page opens.
-   *
-   * After 90 seconds:
-   *
-   * PaymentPage -> /api/payments/pending-email
-   *
-   * The API route checks the real database state:
-   *
-   * - listing live -> no pending email
-   * - payment paid -> no pending email
-   * - payment incomplete -> send pending email
-   *
-   * The actual database check is done on the server.
+   * =====================================================
+   * LOAD RAZORPAY CHECKOUT
+   * =====================================================
    */
 
-  useEffect(() => {
-    paymentCompletedRef.current = false;
+  const loadRazorpayScript =
+    () => {
+      return new Promise<boolean>(
+        (resolve) => {
+          if (window.Razorpay) {
+            resolve(true);
+            return;
+          }
 
-    const timer = window.setTimeout(async () => {
-      if (paymentCompletedRef.current) {
-        return;
-      }
+          const existingScript =
+            document.querySelector(
+              'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+            );
+
+          if (existingScript) {
+            existingScript.addEventListener(
+              "load",
+              () =>
+                resolve(
+                  !!window.Razorpay
+                )
+            );
+
+            existingScript.addEventListener(
+              "error",
+              () =>
+                resolve(false)
+            );
+
+            return;
+          }
+
+          const script =
+            document.createElement(
+              "script"
+            );
+
+          script.src =
+            "https://checkout.razorpay.com/v1/checkout.js";
+
+          script.async = true;
+
+          script.onload = () => {
+            resolve(
+              !!window.Razorpay
+            );
+          };
+
+          script.onerror = () => {
+            resolve(false);
+          };
+
+          document.body.appendChild(
+            script
+          );
+        }
+      );
+    };
+
+  /*
+   * =====================================================
+   * HANDLE PAYMENT
+   * =====================================================
+   */
+
+  const handlePayment =
+    async () => {
+      setIsLoading(true);
+
+      setPaymentMessage("");
+
+      setPaymentError("");
 
       try {
-        const response = await fetch(
-          "/api/payments/pending-email",
-          {
-            method: "POST",
+        /*
+         * 1. Load Razorpay
+         */
 
-            headers: {
-              "Content-Type": "application/json",
-            },
+        const razorpayLoaded =
+          await loadRazorpayScript();
 
-            body: JSON.stringify({
-              listingId,
-            }),
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-          console.error(
-            "Pending business email check failed:",
-            data.error
+        if (
+          !razorpayLoaded ||
+          !window.Razorpay
+        ) {
+          setPaymentError(
+            "Razorpay Checkout could not be loaded. Please check your internet connection and try again."
           );
+
+          setIsLoading(false);
 
           return;
         }
 
-        console.log(
-          "Pending business email check completed:",
-          data
-        );
-      } catch (error) {
-        console.error(
-          "Pending business email request failed:",
-          error
-        );
-      }
-    }, 90_000);
-
-    pendingEmailTimerRef.current = timer;
-
-    return () => {
-      window.clearTimeout(timer);
-
-      if (pendingEmailTimerRef.current === timer) {
-        pendingEmailTimerRef.current = null;
-      }
-    };
-  }, [listingId]);
-
-  const loadRazorpayScript = () => {
-    return new Promise<boolean>((resolve) => {
-      if (window.Razorpay) {
-        resolve(true);
-        return;
-      }
-
-      const existingScript = document.querySelector(
-        'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
-      );
-
-      if (existingScript) {
-        existingScript.addEventListener("load", () =>
-          resolve(!!window.Razorpay)
-        );
-
-        existingScript.addEventListener("error", () =>
-          resolve(false)
-        );
-
-        return;
-      }
-
-      const script = document.createElement("script");
-
-      script.src =
-        "https://checkout.razorpay.com/v1/checkout.js";
-
-      script.async = true;
-
-      script.onload = () => {
-        resolve(!!window.Razorpay);
-      };
-
-      script.onerror = () => {
-        resolve(false);
-      };
-
-      document.body.appendChild(script);
-    });
-  };
-
-  const handlePayment = async () => {
-    setIsLoading(true);
-    setPaymentMessage("");
-    setPaymentError("");
-
-    try {
-      // 1. Load Razorpay Checkout
-      const razorpayLoaded =
-        await loadRazorpayScript();
-
-      if (!razorpayLoaded || !window.Razorpay) {
-        setPaymentError(
-          "Razorpay Checkout could not be loaded. Please check your internet connection and try again."
-        );
-
-        setIsLoading(false);
-        return;
-      }
-
-      // 2. Ask our server to create the order
-      // The server verifies the user/listing and gets
-      // the real amount from the database.
-      const response = await fetch(
-        "/api/payments/create-order",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            listingId,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        setPaymentError(
-          data.error ||
-            "Unable to create the payment order."
-        );
-
-        setIsLoading(false);
-        return;
-      }
-
-      // 3. Open Razorpay Checkout
-      const options: RazorpayOptions = {
-        key: data.keyId,
-
-        amount: data.amount,
-
-        currency: data.currency,
-
-        name: "OutbidInd",
-
-        description:
-          `Business listing payment - ${businessName}`,
-
-        order_id: data.orderId,
-
-        // 4. Verify payment on our server
-        handler: async (paymentResponse) => {
-          try {
-            setPaymentMessage(
-              "Verifying your payment..."
-            );
-
-            setPaymentError("");
-
-            const verifyResponse = await fetch(
-              "/api/payments/verify",
-              {
-                method: "POST",
-
-                headers: {
-                  "Content-Type": "application/json",
-                },
-
-                body: JSON.stringify({
-                  paymentOrderId:
-                    data.paymentOrderId,
-
-                  razorpay_payment_id:
-                    paymentResponse.razorpay_payment_id,
-
-                  razorpay_order_id:
-                    paymentResponse.razorpay_order_id,
-
-                  razorpay_signature:
-                    paymentResponse.razorpay_signature,
-                }),
-              }
-            );
-
-            const verifyData =
-              await verifyResponse.json();
-
-            if (
-              !verifyResponse.ok ||
-              !verifyData.success
-            ) {
-              setPaymentError(
-                verifyData.error ||
-                  "Payment verification failed. Please contact support."
-              );
-
-              setPaymentMessage("");
-              setIsLoading(false);
-
-              return;
-            }
-
-            /*
-             * Payment successfully verified.
-             *
-             * Stop the pending-email timer immediately.
-             */
-            paymentCompletedRef.current = true;
-
-            if (
-              pendingEmailTimerRef.current !== null
-            ) {
-              window.clearTimeout(
-                pendingEmailTimerRef.current
-              );
-
-              pendingEmailTimerRef.current = null;
-            }
-
-            window.dispatchEvent(
-              new CustomEvent(
-                "outbidind:listing-status-changed",
-                {
-                  detail: {
-                    listingId,
-                    status: "live",
-                  },
-                }
-              )
-            );
-
-            setPaymentMessage(
-              "Payment verified successfully."
-            );
-
-            setIsLoading(false);
-
-            console.log(
-              "Payment verified:",
-              verifyData
-            );
-          } catch (error) {
-            console.error(
-              "Payment verification error:",
-              error
-            );
-
-            setPaymentError(
-              "Payment was completed, but verification could not be completed. Please contact support."
-            );
-
-            setPaymentMessage("");
-            setIsLoading(false);
-          }
-        },
-
-        theme: {
-          color: "#e4572e",
-        },
-
-        modal: {
-          ondismiss: () => {
-            setPaymentMessage(
-              "Payment window closed. You can try again."
-            );
-
-            setIsLoading(false);
-          },
-        },
-
         /*
-         * PAYMENT METHODS
-         *
-         * Only UPI and Cards are explicitly configured.
-         *
-         * show_default_blocks: false
-         * means Razorpay should not add its
-         * default payment-method blocks.
+         * 2. Create payment order
          */
 
-        config: {
-          display: {
-            blocks: {
-              upi: {
-                name: "Pay via UPI",
+        const response =
+          await fetch(
+            "/api/payments/create-order",
+            {
+              method: "POST",
 
-                instruments: [
-                  {
-                    method: "upi",
-                  },
-                ],
+              headers: {
+                "Content-Type":
+                  "application/json",
               },
 
-              cards: {
-                name: "Pay via Cards",
+              body: JSON.stringify({
+                listingId,
+              }),
+            }
+          );
 
-                instruments: [
-                  {
-                    method: "card",
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          setPaymentError(
+            data.error ||
+              "Unable to create the payment order."
+          );
+
+          setIsLoading(false);
+
+          return;
+        }
+
+        /*
+         * 3. Open Razorpay
+         */
+
+        const options: RazorpayOptions =
+          {
+            key: data.keyId,
+
+            amount:
+              data.amount,
+
+            currency:
+              data.currency,
+
+            name: "OutbidInd",
+
+            description:
+              `Business listing payment - ${businessName}`,
+
+            order_id:
+              data.orderId,
+
+            /*
+             * 4. Payment verification
+             */
+
+            handler:
+              async (
+                paymentResponse
+              ) => {
+                try {
+                  setPaymentMessage(
+                    "Verifying your payment..."
+                  );
+
+                  setPaymentError(
+                    ""
+                  );
+
+                  const verifyResponse =
+                    await fetch(
+                      "/api/payments/verify",
+                      {
+                        method:
+                          "POST",
+
+                        headers: {
+                          "Content-Type":
+                            "application/json",
+                        },
+
+                        body: JSON.stringify(
+                          {
+                            paymentOrderId:
+                              data.paymentOrderId,
+
+                            razorpay_payment_id:
+                              paymentResponse.razorpay_payment_id,
+
+                            razorpay_order_id:
+                              paymentResponse.razorpay_order_id,
+
+                            razorpay_signature:
+                              paymentResponse.razorpay_signature,
+                          }
+                        ),
+                      }
+                    );
+
+                  const verifyData =
+                    await verifyResponse.json();
+
+                  if (
+                    !verifyResponse.ok ||
+                    !verifyData.success
+                  ) {
+                    setPaymentError(
+                      verifyData.error ||
+                        "Payment verification failed. Please contact support."
+                    );
+
+                    setPaymentMessage(
+                      ""
+                    );
+
+                    setIsLoading(
+                      false
+                    );
+
+                    return;
+                  }
+
+                  /*
+                   * =================================================
+                   * PAYMENT SUCCESS
+                   * =================================================
+                   *
+                   * There is intentionally NO browser timer here.
+                   *
+                   * QStash owns the delayed pending-email job.
+                   * When that job runs, it checks the database.
+                   *
+                   * Paid -> no pending email.
+                   * Unpaid -> pending email.
+                   */
+
+                  setPaymentMessage(
+                    "Payment verified successfully."
+                  );
+
+                  setIsLoading(
+                    false
+                  );
+
+                  console.log(
+                    "Payment verified:",
+                    verifyData
+                  );
+                } catch (error) {
+                  console.error(
+                    "Payment verification error:",
+                    error
+                  );
+
+                  setPaymentError(
+                    "Payment was completed, but verification could not be completed. Please contact support."
+                  );
+
+                  setPaymentMessage(
+                    ""
+                  );
+
+                  setIsLoading(
+                    false
+                  );
+                }
+              },
+
+            theme: {
+              color:
+                "#e4572e",
+            },
+
+            modal: {
+              ondismiss:
+                () => {
+                  setPaymentMessage(
+                    "Payment window closed. You can try again."
+                  );
+
+                  setIsLoading(
+                    false
+                  );
+                },
+            },
+
+            config: {
+              display: {
+                blocks: {
+                  upi: {
+                    name:
+                      "Pay via UPI",
+
+                    instruments:
+                      [
+                        {
+                          method:
+                            "upi",
+                        },
+                      ],
                   },
+
+                  cards: {
+                    name:
+                      "Pay via Cards",
+
+                    instruments:
+                      [
+                        {
+                          method:
+                            "card",
+                        },
+                      ],
+                  },
+                },
+
+                sequence: [
+                  "block.upi",
+                  "block.cards",
                 ],
+
+                preferences: {
+                  show_default_blocks:
+                    false,
+                },
               },
             },
+          };
 
-            sequence: [
-              "block.upi",
-              "block.cards",
-            ],
+        const razorpay =
+          new window.Razorpay(
+            options
+          );
 
-            preferences: {
-              show_default_blocks: false,
-            },
-          },
-        },
-      };
+        razorpay.open();
+      } catch (error) {
+        console.error(
+          "Razorpay checkout error:",
+          error
+        );
 
-      const razorpay =
-        new window.Razorpay(options);
+        setPaymentError(
+          "Unable to open the payment gateway. Please try again."
+        );
 
-      razorpay.open();
-    } catch (error) {
-      console.error(
-        "Razorpay checkout error:",
-        error
-      );
-
-      setPaymentError(
-        "Unable to open the payment gateway. Please try again."
-      );
-
-      setIsLoading(false);
-    }
-  };
+        setIsLoading(false);
+      }
+    };
 
   return (
     <div className="space-y-6">
       {/* Header */}
+
       <div>
         <p className="text-sm font-semibold text-orange-600">
           Security Check Passed
@@ -473,12 +476,15 @@ export default function PaymentPage({
         </h2>
 
         <p className="mt-2 text-sm text-slate-500">
-          Your business passed the required security
-          checks. Complete the payment to continue.
+          Your business passed
+          the required security
+          checks. Complete the
+          payment to continue.
         </p>
       </div>
 
       {/* Business */}
+
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Business
@@ -490,24 +496,28 @@ export default function PaymentPage({
       </div>
 
       {/* Amount */}
+
       <div className="rounded-xl border border-orange-200 bg-orange-50 p-6">
         <p className="text-sm font-semibold text-slate-600">
           Amount to Pay
         </p>
 
         <p className="mt-2 text-3xl font-extrabold text-slate-900">
-          ₹{bidAmount.toLocaleString("en-IN")}
+          ₹
+          {bidAmount.toLocaleString(
+            "en-IN"
+          )}
         </p>
       </div>
 
       {/* Payment Methods */}
+
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <p className="text-sm font-bold text-slate-900">
           Payment Methods
         </p>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {/* UPI */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50 text-lg">
@@ -520,14 +530,16 @@ export default function PaymentPage({
                 </p>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  Google Pay, PhonePe, BHIM and other
-                  supported UPI apps
+                  Google Pay,
+                  PhonePe, BHIM
+                  and other
+                  supported UPI
+                  apps
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Cards */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-lg">
@@ -540,7 +552,9 @@ export default function PaymentPage({
                 </p>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  Credit and debit cards through Razorpay
+                  Credit and debit
+                  cards through
+                  Razorpay
                 </p>
               </div>
             </div>
@@ -548,20 +562,26 @@ export default function PaymentPage({
         </div>
       </div>
 
-      {/* Information */}
+      {/* Security */}
+
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
         <p className="font-semibold">
           Secure Razorpay Payment
         </p>
 
         <p className="mt-1 text-xs leading-5">
-          Your payment order is created securely on our
-          server. Payment verification will happen on the
-          server before your listing becomes live.
+          Your payment order
+          is created securely
+          on our server.
+          Payment verification
+          happens on the server
+          before your listing
+          becomes live.
         </p>
       </div>
 
-      {/* Success message */}
+      {/* Message */}
+
       {paymentMessage && (
         <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
           {paymentMessage}
@@ -569,6 +589,7 @@ export default function PaymentPage({
       )}
 
       {/* Error */}
+
       {paymentError && (
         <div
           role="alert"
@@ -579,6 +600,7 @@ export default function PaymentPage({
       )}
 
       {/* Buttons */}
+
       <div className="flex gap-3">
         <button
           type="button"
@@ -591,7 +613,9 @@ export default function PaymentPage({
 
         <button
           type="button"
-          onClick={handlePayment}
+          onClick={
+            handlePayment
+          }
           disabled={isLoading}
           className="flex-1 rounded-lg bg-[#e4572e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 disabled:cursor-wait disabled:opacity-70"
         >

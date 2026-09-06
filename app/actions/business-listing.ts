@@ -1,5 +1,6 @@
 "use server";
 
+import { Client } from "@upstash/qstash";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkWebsiteSecurity } from "@/app/actions/website-security";
@@ -27,6 +28,46 @@ type SubmitBusinessListingResult = {
 };
 
 const MINIMUM_NEW_BUSINESS_BID = 99;
+
+const qstashClient = new Client({
+  token: process.env.QSTASH_TOKEN!,
+});
+
+async function schedulePendingBusinessEmail(
+  listingId: string
+) {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    "https://www.outbidind.com";
+
+  const jobUrl =
+    `${siteUrl.replace(/\/$/, "")}/api/payments/pending-email-job`;
+
+  if (!process.env.QSTASH_TOKEN) {
+    throw new Error(
+      "QSTASH_TOKEN is not configured."
+    );
+  }
+
+  const result = await qstashClient.publishJSON({
+    url: jobUrl,
+    body: { listingId },
+    delay: "90s",
+    contentBasedDeduplication: true,
+  });
+
+  console.log(
+    "Pending business email scheduled with QStash:",
+    {
+      listingId,
+      messageId: result.messageId,
+      delay: "90s",
+      jobUrl,
+    }
+  );
+
+  return result;
+}
 
 /*
  * =========================================================
@@ -1472,6 +1513,50 @@ export async function submitBusinessListing(
    *
    * Email failure must never block the listing flow.
    */
+
+  /*
+   * =====================================================
+   * 9. DURABLE PENDING PAYMENT NOTIFICATION
+   * =====================================================
+   *
+   * QStash keeps this delayed job on the server, so the
+   * notification does not depend on the user's browser,
+   * payment page, computer, or internet connection staying
+   * open for the next 90 seconds.
+   *
+   * If scheduling fails, do not return a successful listing
+   * that would miss the required pending-payment notification.
+   */
+  try {
+    await schedulePendingBusinessEmail(
+      listing.id
+    );
+  } catch (qstashError) {
+    console.error(
+      "Failed to schedule pending business email with QStash:",
+      qstashError
+    );
+
+    const { error: cleanupError } =
+      await supabaseAdmin
+        .from("business_listings")
+        .delete()
+        .eq("id", listing.id)
+        .eq("owner_id", user.id);
+
+    if (cleanupError) {
+      console.error(
+        "Failed to clean up listing after QStash scheduling failure:",
+        cleanupError
+      );
+    }
+
+    return {
+      success: false,
+      error:
+        "We couldn't complete the submission right now. Please try again.",
+    };
+  }
 
   /*
    * =====================================================
