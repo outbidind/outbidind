@@ -840,6 +840,96 @@ async function analyzeWebsiteContent(
   }
 }
 
+/*
+ * =========================================================
+ * PENDING PAYMENT EMAIL CHECK
+ * =========================================================
+ *
+ * Called by PaymentPage after 90 seconds. The delay itself
+ * is handled by the client so this action only checks the
+ * current server-side payment/listing state.
+ *
+ * - listing is live -> do not send
+ * - payment is paid -> do not send
+ * - payment is still incomplete -> send pending email
+ */
+export async function sendPendingBusinessEmailIfUnpaid(
+  listingId: string
+): Promise<{ success: boolean; sent: boolean }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user || !listingId) {
+    return { success: false, sent: false };
+  }
+
+  const { data: listing, error: listingError } =
+    await supabaseAdmin
+      .from("business_listings")
+      .select("id, business_name, listing_status, owner_id")
+      .eq("id", listingId)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+
+  if (listingError) {
+    console.error(
+      "Pending email listing lookup failed:",
+      listingError
+    );
+    return { success: false, sent: false };
+  }
+
+  if (!listing) {
+    return { success: false, sent: false };
+  }
+
+  if (listing.listing_status === "live") {
+    return { success: true, sent: false };
+  }
+
+  const { data: paidPayment, error: paidPaymentError } =
+    await supabaseAdmin
+      .from("payment_orders")
+      .select("id")
+      .eq("listing_id", listing.id)
+      .eq("user_id", user.id)
+      .eq("status", "paid")
+      .limit(1)
+      .maybeSingle();
+
+  if (paidPaymentError) {
+    console.error(
+      "Pending email payment lookup failed:",
+      paidPaymentError
+    );
+    return { success: false, sent: false };
+  }
+
+  if (paidPayment) {
+    return { success: true, sent: false };
+  }
+
+  try {
+    await sendPendingBusinessEmail({
+      to: user.email,
+      businessName: listing.business_name,
+      listingId: listing.id,
+    });
+
+    return { success: true, sent: true };
+  } catch (emailError) {
+    console.error(
+      "Pending business email failed:",
+      emailError
+    );
+    return { success: false, sent: false };
+  }
+}
+
 export async function submitBusinessListing(
   input: SubmitBusinessListingInput
 ): Promise<SubmitBusinessListingResult> {
@@ -1188,14 +1278,6 @@ export async function submitBusinessListing(
      * Resume payment.
      */
 
-    void sendPendingBusinessEmail({
-      to: user.email,
-      businessName: existingListing.business_name,
-      listingId: existingListing.id,
-    }).catch((emailError) => {
-      console.error("Pending business email failed:", emailError);
-    });
-
     return {
       success: true,
       resumePayment: true,
@@ -1390,14 +1472,6 @@ export async function submitBusinessListing(
    *
    * Email failure must never block the listing flow.
    */
-
-  void sendPendingBusinessEmail({
-    to: user.email,
-    businessName,
-    listingId: listing.id,
-  }).catch((emailError) => {
-    console.error("Pending business email failed:", emailError);
-  });
 
   /*
    * =====================================================

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type PaymentPageProps = {
   listingId: string;
@@ -88,6 +88,87 @@ export default function PaymentPage({
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState("");
   const [paymentError, setPaymentError] = useState("");
+
+  const paymentCompletedRef = useRef(false);
+  const pendingEmailTimerRef = useRef<number | null>(null);
+
+  /*
+   * =========================================================
+   * DELAYED PENDING PAYMENT EMAIL
+   * =========================================================
+   *
+   * Start the 90-second countdown when the payment page opens.
+   *
+   * After 90 seconds:
+   *
+   * PaymentPage -> /api/payments/pending-email
+   *
+   * The API route checks the real database state:
+   *
+   * - listing live -> no pending email
+   * - payment paid -> no pending email
+   * - payment incomplete -> send pending email
+   *
+   * The actual database check is done on the server.
+   */
+
+  useEffect(() => {
+    paymentCompletedRef.current = false;
+
+    const timer = window.setTimeout(async () => {
+      if (paymentCompletedRef.current) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          "/api/payments/pending-email",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+              listingId,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          console.error(
+            "Pending business email check failed:",
+            data.error
+          );
+
+          return;
+        }
+
+        console.log(
+          "Pending business email check completed:",
+          data
+        );
+      } catch (error) {
+        console.error(
+          "Pending business email request failed:",
+          error
+        );
+      }
+    }, 90_000);
+
+    pendingEmailTimerRef.current = timer;
+
+    return () => {
+      window.clearTimeout(timer);
+
+      if (pendingEmailTimerRef.current === timer) {
+        pendingEmailTimerRef.current = null;
+      }
+    };
+  }, [listingId]);
 
   const loadRazorpayScript = () => {
     return new Promise<boolean>((resolve) => {
@@ -247,6 +328,35 @@ export default function PaymentPage({
               return;
             }
 
+            /*
+             * Payment successfully verified.
+             *
+             * Stop the pending-email timer immediately.
+             */
+            paymentCompletedRef.current = true;
+
+            if (
+              pendingEmailTimerRef.current !== null
+            ) {
+              window.clearTimeout(
+                pendingEmailTimerRef.current
+              );
+
+              pendingEmailTimerRef.current = null;
+            }
+
+            window.dispatchEvent(
+              new CustomEvent(
+                "outbidind:listing-status-changed",
+                {
+                  detail: {
+                    listingId,
+                    status: "live",
+                  },
+                }
+              )
+            );
+
             setPaymentMessage(
               "Payment verified successfully."
             );
@@ -293,14 +403,7 @@ export default function PaymentPage({
          *
          * show_default_blocks: false
          * means Razorpay should not add its
-         * default payment-method blocks such as:
-         *
-         * - Netbanking
-         * - Wallets
-         * - EMI
-         * - Other default methods
-         *
-         * UPI on desktop can appear as a QR code.
+         * default payment-method blocks.
          */
 
         config: {

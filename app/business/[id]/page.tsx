@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -415,9 +416,14 @@ export default async function BusinessPage({
             href="/"
             className="flex items-center gap-3"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e4572e] text-sm font-black text-white">
-              O
-            </span>
+            <Image
+              src="/logo.png"
+              alt="OutbidInd"
+              width={44}
+              height={44}
+              priority
+              className="h-11 w-11 object-contain"
+            />
 
             <span className="text-lg font-bold tracking-tight text-slate-950">
               Outbid<span className="text-[#e4572e]">Ind</span>

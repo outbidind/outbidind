@@ -1,6 +1,7 @@
 import "server-only";
 
 import { resend } from "@/lib/resend";
+import { getBusinessPath } from "@/lib/business-url";
 
 type SendPendingBusinessEmailInput = {
   to: string | undefined;
@@ -38,7 +39,7 @@ export async function sendPendingBusinessEmail({
   }
 
   const safeBusinessName = escapeHtml(businessName);
-  const continuePaymentUrl = `${siteUrl}/business/${listingId}`;
+  const continuePaymentUrl = `${siteUrl}${getBusinessPath(businessName, listingId)}`;
 
   const { data, error } = await resend.emails.send({
     from: "OutbidInd <noreply@outbidind.com>",
@@ -82,7 +83,7 @@ export async function sendLiveBusinessEmail({
   }
 
   const safeBusinessName = escapeHtml(businessName);
-  const businessUrl = `${siteUrl}/business/${listingId}`;
+  const businessUrl = `${siteUrl}${getBusinessPath(businessName, listingId)}`;
 
   const { data, error } = await resend.emails.send({
     from: "OutbidInd <noreply@outbidind.com>",

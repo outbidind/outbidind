@@ -49,6 +49,46 @@ export default function RealtimeBusiness({
     useState<Bid[]>(initialBids);
 
   useEffect(() => {
+    const handleListingStatusChanged = (
+      event: Event
+    ) => {
+      const customEvent =
+        event as CustomEvent<{
+          listingId?: string;
+          status?: string;
+        }>;
+
+      if (
+        customEvent.detail?.listingId !==
+        listingId
+      ) {
+        return;
+      }
+
+      if (
+        customEvent.detail?.status !==
+        "live"
+      ) {
+        return;
+      }
+
+      router.refresh();
+    };
+
+    window.addEventListener(
+      "outbidind:listing-status-changed",
+      handleListingStatusChanged
+    );
+
+    return () => {
+      window.removeEventListener(
+        "outbidind:listing-status-changed",
+        handleListingStatusChanged
+      );
+    };
+  }, [listingId, router]);
+
+  useEffect(() => {
     const supabase = createClient();
 
     const channel = supabase
@@ -86,7 +126,7 @@ export default function RealtimeBusiness({
             );
 
           // IMPORTANT:
-          // current_bid is now the accumulated
+          // current_bid is the accumulated
           // auction total.
 
           setCurrentBid(
@@ -94,7 +134,7 @@ export default function RealtimeBusiness({
           );
 
           /*
-           * Refresh server-rendered page.
+           * Refresh the server-rendered page.
            *
            * This keeps:
            * - payment UI
@@ -103,6 +143,9 @@ export default function RealtimeBusiness({
            * - auction data
            *
            * synchronized.
+           *
+           * This also handles status changes
+           * such as approved -> live.
            */
 
           router.refresh();
@@ -184,6 +227,19 @@ export default function RealtimeBusiness({
           `Realtime business ${listingId}:`,
           status
         );
+
+        /*
+         * Once the realtime subscription is
+         * successfully connected, refresh the
+         * server-rendered page once.
+         *
+         * This handles cases where the listing
+         * status changed before the realtime
+         * connection was established.
+         */
+        if (status === "SUBSCRIBED") {
+          router.refresh();
+        }
       });
 
     return () => {
