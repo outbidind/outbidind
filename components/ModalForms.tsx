@@ -100,10 +100,13 @@ function GoogleButton({
 
     const supabase = createClient();
 
+    const redirectOrigin =
+      process.env.NEXT_PUBLIC_SITE_URL?.trim() || window.location.origin;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${redirectOrigin}/auth/callback`,
       },
     });
 
