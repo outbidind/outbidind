@@ -71,8 +71,14 @@ function BusinessLogo({
 
   if (!faviconUrl || imageFailed) {
     return (
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-sm font-black text-[#d94d28]">
-        {initials || "B"}
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <Image
+          src="/logo.png"
+          alt="OutbidInd"
+          width={40}
+          height={40}
+          className="h-8 w-8 object-contain"
+        />
       </span>
     );
   }
