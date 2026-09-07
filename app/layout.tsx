@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://outbidind.com"),
+  metadataBase: new URL("https://www.outbidind.com"),
 
   title: {
     default: "OutbidInd – Business Auction & Bidding Marketplace in India",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   authors: [
     {
       name: "OutbidInd",
-      url: "https://outbidind.com",
+      url: "https://www.outbidind.com",
     },
   ],
 
@@ -49,12 +49,12 @@ export const metadata: Metadata = {
   publisher: "OutbidInd",
 
   alternates: {
-    canonical: "https://outbidind.com",
+    canonical: "https://www.outbidind.com",
   },
 
   openGraph: {
     type: "website",
-    url: "https://outbidind.com",
+    url: "https://www.outbidind.com",
     siteName: "OutbidInd",
     title:
       "OutbidInd – Business Auction & Bidding Marketplace in India",
