@@ -11,7 +11,7 @@ type PublicBusinessListing = {
 };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://outbidind.com";
+  const baseUrl = "https://www.outbidind.com";
 
   const staticPages: MetadataRoute.Sitemap = [
     {

@@ -5,12 +5,12 @@ export const metadata: Metadata = {
   description:
     "Explore live business auctions on OutbidInd, compare current auction totals and discover businesses available for real-time bidding across India.",
   alternates: {
-    canonical: "/live-bids",
+    canonical: "https://www.outbidind.com/live-bids",
   },
 
   openGraph: {
     type: "website",
-    url: "/live-bids",
+    url: "https://www.outbidind.com/live-bids",
     siteName: "OutbidInd",
     title: "Live Business Auctions & Bids in India",
     description:

@@ -5,12 +5,12 @@ export const metadata: Metadata = {
   description:
     "List your business on OutbidInd and reach users interested in real-time business auctions and competitive bidding across India.",
   alternates: {
-    canonical: "/list-your-business",
+    canonical: "https://www.outbidind.com/list-your-business",
   },
 
   openGraph: {
     type: "website",
-    url: "/list-your-business",
+    url: "https://www.outbidind.com/list-your-business",
     siteName: "OutbidInd",
     title: "List Your Business for Auction in India",
     description:

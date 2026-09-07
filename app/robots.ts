@@ -8,10 +8,9 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [
         "/admin/",
         "/user-panel/",
-        
         "/api/",
       ],
     },
-    sitemap: "https://outbidind.com/sitemap.xml",
+    sitemap: "https://www.outbidind.com/sitemap.xml",
   };
 }

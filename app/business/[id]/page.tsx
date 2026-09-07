@@ -338,7 +338,7 @@ export default async function BusinessPage({
   // =====================================================
 
   const businessPageUrl =
-    `https://outbidind.com${getBusinessPath(
+    `https://www.outbidind.com${getBusinessPath(
       listing.business_name,
       listing.id
     )}`;
@@ -354,7 +354,7 @@ export default async function BusinessPage({
     isPartOf: {
       "@type": "WebSite",
       name: "OutbidInd",
-      url: "https://outbidind.com",
+      url: "https://www.outbidind.com",
     },
     about: {
       "@type": "Thing",
@@ -370,13 +370,13 @@ export default async function BusinessPage({
           "@type": "ListItem",
           position: 1,
           name: "Home",
-          item: "https://outbidind.com",
+          item: "https://www.outbidind.com",
         },
         {
           "@type": "ListItem",
           position: 2,
           name: "Live Bids",
-          item: "https://outbidind.com/live-bids",
+          item: "https://www.outbidind.com/live-bids",
         },
         {
           "@type": "ListItem",
