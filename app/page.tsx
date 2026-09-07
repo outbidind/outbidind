@@ -60,21 +60,35 @@ function BusinessLogo({
   website: string | null;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const websiteUrl = getWebsiteUrl(website);
   const faviconUrl = getFaviconUrl(website);
 
-  const initials = businessName
-    .split(" ")
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const isOutbidIndBusiness =
+    businessName.trim().toLowerCase() === "outbidind";
 
-  if (!faviconUrl || imageFailed) {
+  let shouldUseFavicon = Boolean(faviconUrl);
+
+  if (websiteUrl) {
+    try {
+      const hostname = new URL(websiteUrl).hostname
+        .toLowerCase()
+        .replace(/^www\./, "");
+
+      // Never use OutbidInd's favicon for another business.
+      if (!isOutbidIndBusiness && hostname === "outbidind.com") {
+        shouldUseFavicon = false;
+      }
+    } catch {
+      shouldUseFavicon = false;
+    }
+  }
+
+  if (isOutbidIndBusiness) {
     return (
       <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
         <Image
           src="/logo.png"
-          alt="OutbidInd"
+          alt="OutbidInd logo"
           width={40}
           height={40}
           className="h-8 w-8 object-contain"
@@ -83,11 +97,28 @@ function BusinessLogo({
     );
   }
 
+  if (!shouldUseFavicon || imageFailed) {
+    const initials = businessName
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+    return (
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-sm font-black text-[#d94d28]">
+        {initials || "B"}
+      </span>
+    );
+  }
+
   return (
     <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
       <img
-        src={faviconUrl}
-        alt=""
+        src={faviconUrl!}
+        alt={`${businessName} logo`}
         className="h-7 w-7 object-contain"
         onError={() => setImageFailed(true)}
       />
