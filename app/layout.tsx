@@ -76,13 +76,25 @@ export const metadata: Metadata = {
     title:
       "OutbidInd – Business Auction & Bidding Marketplace in India",
     description:
-      "Discover businesses and participate in real-time business auctions and bidding across India.",
+      "Discover businesses and participate in real-time business auctions and competitive bidding across India.",
     images: ["/logo.png"],
   },
 
   robots: {
     index: true,
     follow: true,
+  },
+};
+
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": "https://www.outbidind.com/#organization",
+  name: "OutbidInd",
+  url: "https://www.outbidind.com",
+  logo: {
+    "@type": "ImageObject",
+    url: "https://www.outbidind.com/logo.png",
   },
 };
 
@@ -99,6 +111,13 @@ export default function RootLayout({
         <PendingEmailWatcher />
         {children}
         <TermsAcceptanceModal />
+
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationSchema),
+          }}
+        />
       </body>
     </html>
   );
