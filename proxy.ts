@@ -2,7 +2,7 @@ import { updateSession } from "./lib/supabase/proxy";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 const MAINTENANCE_BYPASS_KEY =
   process.env.MAINTENANCE_BYPASS_KEY || "";
