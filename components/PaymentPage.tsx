@@ -9,458 +9,115 @@ type PaymentPageProps = {
   onBack: () => void;
 };
 
-type RazorpayResponse = {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-};
-
-type RazorpayOptions = {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-
-  handler: (
-    response: RazorpayResponse
-  ) => void;
-
-  theme?: {
-    color: string;
-  };
-
-  modal?: {
-    ondismiss?: () => void;
-  };
-
-  config?: {
-    display?: {
-      blocks?: {
-        upi?: {
-          name: string;
-          instruments: {
-            method: string;
-          }[];
-        };
-
-        cards?: {
-          name: string;
-          instruments: {
-            method: string;
-          }[];
-        };
-      };
-
-      sequence?: string[];
-
-      preferences?: {
-        show_default_blocks?: boolean;
-      };
-    };
-  };
-};
-
-type RazorpayInstance = {
-  open: () => void;
-
-  on?: (
-    event: string,
-    callback: (
-      response: unknown
-    ) => void
-  ) => void;
-};
-
-type RazorpayConstructor =
-  new (
-    options: RazorpayOptions
-  ) => RazorpayInstance;
-
-declare global {
-  interface Window {
-    Razorpay?: RazorpayConstructor;
-  }
-}
-
 export default function PaymentPage({
   listingId,
   businessName,
   bidAmount,
   onBack,
 }: PaymentPageProps) {
-  const [
-    isLoading,
-    setIsLoading,
-  ] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [
-    paymentMessage,
-    setPaymentMessage,
-  ] = useState("");
+  const [paymentMessage, setPaymentMessage] = useState("");
 
-  const [
-    paymentError,
-    setPaymentError,
-  ] = useState("");
-
-  /*
-   * =====================================================
-   * LOAD RAZORPAY CHECKOUT
-   * =====================================================
-   */
-
-  const loadRazorpayScript =
-    () => {
-      return new Promise<boolean>(
-        (resolve) => {
-          if (window.Razorpay) {
-            resolve(true);
-            return;
-          }
-
-          const existingScript =
-            document.querySelector(
-              'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
-            );
-
-          if (existingScript) {
-            existingScript.addEventListener(
-              "load",
-              () =>
-                resolve(
-                  !!window.Razorpay
-                )
-            );
-
-            existingScript.addEventListener(
-              "error",
-              () =>
-                resolve(false)
-            );
-
-            return;
-          }
-
-          const script =
-            document.createElement(
-              "script"
-            );
-
-          script.src =
-            "https://checkout.razorpay.com/v1/checkout.js";
-
-          script.async = true;
-
-          script.onload = () => {
-            resolve(
-              !!window.Razorpay
-            );
-          };
-
-          script.onerror = () => {
-            resolve(false);
-          };
-
-          document.body.appendChild(
-            script
-          );
-        }
-      );
-    };
+  const [paymentError, setPaymentError] = useState("");
 
   /*
    * =====================================================
    * HANDLE PAYMENT
    * =====================================================
+   *
+   * Dodo owns the hosted checkout.
+   *
+   * Payment success is NOT trusted from the browser.
+   * Dodo's signed webhook is the source of truth.
    */
 
-  const handlePayment =
-    async () => {
-      setIsLoading(true);
+  const handlePayment = async () => {
+    setIsLoading(true);
 
-      setPaymentMessage("");
+    setPaymentMessage("");
 
-      setPaymentError("");
+    setPaymentError("");
 
-      try {
-        /*
-         * 1. Load Razorpay
-         */
+    try {
+      /*
+       * 1. CREATE PAYMENT SESSION
+       */
 
-        const razorpayLoaded =
-          await loadRazorpayScript();
+      const response = await fetch(
+        "/api/payments/create-order",
+        {
+          method: "POST",
 
-        if (
-          !razorpayLoaded ||
-          !window.Razorpay
-        ) {
-          setPaymentError(
-            "Razorpay Checkout could not be loaded. Please check your internet connection and try again."
-          );
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-          setIsLoading(false);
-
-          return;
+          body: JSON.stringify({
+            listingId,
+          }),
         }
+      );
 
-        /*
-         * 2. Create payment order
-         */
+      const data = await response.json();
 
-        const response =
-          await fetch(
-            "/api/payments/create-order",
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-
-              body: JSON.stringify({
-                listingId,
-              }),
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (
-          !response.ok ||
-          !data.success
-        ) {
-          setPaymentError(
-            data.error ||
-              "Unable to create the payment order."
-          );
-
-          setIsLoading(false);
-
-          return;
-        }
-
-        /*
-         * 3. Open Razorpay
-         */
-
-        const options: RazorpayOptions =
-          {
-            key: data.keyId,
-
-            amount:
-              data.amount,
-
-            currency:
-              data.currency,
-
-            name: "OutbidInd",
-
-            description:
-              `Business listing payment - ${businessName}`,
-
-            order_id:
-              data.orderId,
-
-            /*
-             * 4. Payment verification
-             */
-
-            handler:
-              async (
-                paymentResponse
-              ) => {
-                try {
-                  setPaymentMessage(
-                    "Verifying your payment..."
-                  );
-
-                  setPaymentError(
-                    ""
-                  );
-
-                  const verifyResponse =
-                    await fetch(
-                      "/api/payments/verify",
-                      {
-                        method:
-                          "POST",
-
-                        headers: {
-                          "Content-Type":
-                            "application/json",
-                        },
-
-                        body: JSON.stringify(
-                          {
-                            paymentOrderId:
-                              data.paymentOrderId,
-
-                            razorpay_payment_id:
-                              paymentResponse.razorpay_payment_id,
-
-                            razorpay_order_id:
-                              paymentResponse.razorpay_order_id,
-
-                            razorpay_signature:
-                              paymentResponse.razorpay_signature,
-                          }
-                        ),
-                      }
-                    );
-
-                  const verifyData =
-                    await verifyResponse.json();
-
-                  if (
-                    !verifyResponse.ok ||
-                    !verifyData.success
-                  ) {
-                    setPaymentError(
-                      verifyData.error ||
-                        "Payment verification failed. Please contact support."
-                    );
-
-                    setPaymentMessage(
-                      ""
-                    );
-
-                    setIsLoading(
-                      false
-                    );
-
-                    return;
-                  }
-
-                  /*
-                   * =================================================
-                   * PAYMENT SUCCESS
-                   * =================================================
-                   *
-                   * There is intentionally NO browser timer here.
-                   *
-                   * QStash owns the delayed pending-email job.
-                   * When that job runs, it checks the database.
-                   *
-                   * Paid -> no pending email.
-                   * Unpaid -> pending email.
-                   */
-
-                  setPaymentMessage(
-                    "Payment verified successfully."
-                  );
-
-                  setIsLoading(
-                    false
-                  );
-
-                  console.log(
-                    "Payment verified:",
-                    verifyData
-                  );
-                } catch (error) {
-                  console.error(
-                    "Payment verification error:",
-                    error
-                  );
-
-                  setPaymentError(
-                    "Payment was completed, but verification could not be completed. Please contact support."
-                  );
-
-                  setPaymentMessage(
-                    ""
-                  );
-
-                  setIsLoading(
-                    false
-                  );
-                }
-              },
-
-            theme: {
-              color:
-                "#e4572e",
-            },
-
-            modal: {
-              ondismiss:
-                () => {
-                  setPaymentMessage(
-                    "Payment window closed. You can try again."
-                  );
-
-                  setIsLoading(
-                    false
-                  );
-                },
-            },
-
-            config: {
-              display: {
-                blocks: {
-                  upi: {
-                    name:
-                      "Pay via UPI",
-
-                    instruments:
-                      [
-                        {
-                          method:
-                            "upi",
-                        },
-                      ],
-                  },
-
-                  cards: {
-                    name:
-                      "Pay via Cards",
-
-                    instruments:
-                      [
-                        {
-                          method:
-                            "card",
-                        },
-                      ],
-                  },
-                },
-
-                sequence: [
-                  "block.upi",
-                  "block.cards",
-                ],
-
-                preferences: {
-                  show_default_blocks:
-                    false,
-                },
-              },
-            },
-          };
-
-        const razorpay =
-          new window.Razorpay(
-            options
-          );
-
-        razorpay.open();
-      } catch (error) {
-        console.error(
-          "Razorpay checkout error:",
-          error
-        );
-
+      if (!response.ok || !data.success) {
         setPaymentError(
-          "Unable to open the payment gateway. Please try again."
+          data.error ||
+            "Unable to create the payment session."
         );
 
         setIsLoading(false);
+
+        return;
       }
-    };
+
+      /*
+       * 2. OPEN DODO HOSTED CHECKOUT
+       */
+
+      if (
+        !data.checkoutUrl ||
+        typeof data.checkoutUrl !== "string"
+      ) {
+        setPaymentError(
+          "Dodo checkout could not be opened. Please try again."
+        );
+
+        setIsLoading(false);
+
+        return;
+      }
+
+      setPaymentMessage(
+        "Opening secure Dodo payment..."
+      );
+
+      /*
+       * Dodo handles the payment on its hosted
+       * checkout page.
+       *
+       * The browser does NOT verify payment.
+       * The Dodo webhook is responsible for
+       * confirming successful payment server-side.
+       */
+
+      window.location.href = data.checkoutUrl;
+    } catch (error) {
+      console.error(
+        "Dodo checkout error:",
+        error
+      );
+
+      setPaymentError(
+        "Unable to open the payment gateway. Please try again."
+      );
+
+      setPaymentMessage("");
+
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -554,7 +211,7 @@ export default function PaymentPage({
                 <p className="mt-1 text-xs text-slate-500">
                   Credit and debit
                   cards through
-                  Razorpay
+                  Dodo Payments
                 </p>
               </div>
             </div>
@@ -566,15 +223,17 @@ export default function PaymentPage({
 
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
         <p className="font-semibold">
-          Secure Razorpay Payment
+          Secure Dodo Payment
         </p>
 
         <p className="mt-1 text-xs leading-5">
-          Your payment order
+          Your payment session
           is created securely
           on our server.
-          Payment verification
-          happens on the server
+          Payment confirmation
+          happens through
+          secure server-side
+          webhook verification
           before your listing
           becomes live.
         </p>
@@ -613,9 +272,7 @@ export default function PaymentPage({
 
         <button
           type="button"
-          onClick={
-            handlePayment
-          }
+          onClick={handlePayment}
           disabled={isLoading}
           className="flex-1 rounded-lg bg-[#e4572e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#c94724] focus:outline-none focus:ring-4 focus:ring-orange-200 disabled:cursor-wait disabled:opacity-70"
         >

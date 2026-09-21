@@ -131,8 +131,8 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.DODO_PAYMENTS_API_KEY;
     const environment = process.env.DODO_PAYMENTS_ENVIRONMENT;
-    const configuredProductId =
-      process.env.pdt_0Nno7pgqLkcVOpUYuFMCt;
+   const configuredProductId =
+       process.env.DODO_BUSINESS_LISTING_PRODUCT_ID;
     const returnUrl = process.env.DODO_PAYMENTS_RETURN_URL;
 
     if (!apiKey || !environment || !configuredProductId || !returnUrl) {
