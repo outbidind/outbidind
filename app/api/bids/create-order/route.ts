@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
+import DodoPayments from "dodopayments";
+
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const MINIMUM_BID = 99;
 
-export async function POST(
-  request: Request
-) {
+const dodo = new DodoPayments({
+  bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+  environment: process.env.DODO_PAYMENTS_ENVIRONMENT as
+    | "test_mode"
+    | "live_mode",
+});
+
+export async function POST(request: Request) {
+  let createdPaymentOrderId: string | null = null;
+
   try {
-    const supabase =
-      await createClient();
+    const supabase = await createClient();
 
     // =====================================================
     // 1. AUTH
@@ -23,8 +31,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error:
-            "You must be logged in.",
+          error: "You must be logged in.",
         },
         { status: 401 }
       );
@@ -34,24 +41,16 @@ export async function POST(
     // 2. REQUEST BODY
     // =====================================================
 
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    const listingId =
-      body?.listingId;
+    const listingId = body?.listingId;
+    const bidAmount = Number(body?.amount);
 
-    const bidAmount =
-      Number(body?.amount);
-
-    if (
-      !listingId ||
-      typeof listingId !== "string"
-    ) {
+    if (!listingId || typeof listingId !== "string") {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Listing ID is required.",
+          error: "Listing ID is required.",
         },
         { status: 400 }
       );
@@ -68,8 +67,22 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Minimum bid amount is ₹99.",
+          error: "Minimum bid amount is ₹99.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const amountInPaise = Math.round(bidAmount * 100);
+
+    if (
+      !Number.isSafeInteger(amountInPaise) ||
+      amountInPaise <= 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid bid amount.",
         },
         { status: 400 }
       );
@@ -115,8 +128,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Business listing not found.",
+          error: "Business listing not found.",
         },
         { status: 404 }
       );
@@ -126,10 +138,7 @@ export async function POST(
     // 5. LIVE ONLY
     // =====================================================
 
-    if (
-      listing.listing_status !==
-      "live"
-    ) {
+    if (listing.listing_status !== "live") {
       return NextResponse.json(
         {
           success: false,
@@ -140,182 +149,67 @@ export async function POST(
       );
     }
 
+    /*
+     * IMPORTANT:
+     *
+     * We intentionally do NOT compare bidAmount with
+     * current_bid here.
+     *
+     * The existing place_bid() database function remains
+     * the final authority for whether the bid can be placed.
+     */
+
     // =====================================================
-    // IMPORTANT
-    //
-    // We intentionally DO NOT compare bidAmount
-    // with current_bid.
-    //
-    // Any amount >= ₹99 is valid.
+    // 6. DODO CONFIG
     // =====================================================
 
-    const amountInPaise =
-      Math.round(
-        bidAmount * 100
-      );
+    const apiKey =
+      process.env.DODO_PAYMENTS_API_KEY;
+
+    const environment =
+      process.env.DODO_PAYMENTS_ENVIRONMENT;
+
+    const productId =
+      process.env.DODO_BUSINESS_LISTING_PRODUCT_ID;
+
+    const returnUrl =
+      process.env.DODO_PAYMENTS_RETURN_URL;
 
     if (
-      !Number.isSafeInteger(
-        amountInPaise
-      ) ||
-      amountInPaise <= 0
+      !apiKey ||
+      !environment ||
+      !productId ||
+      !returnUrl
     ) {
-      return NextResponse.json(
+      console.error(
+        "Dodo bid payment configuration is missing:",
         {
-          success: false,
-          error:
-            "Invalid bid amount.",
-        },
-        { status: 400 }
+          hasApiKey: Boolean(apiKey),
+          environment,
+          hasProductId: Boolean(productId),
+          hasReturnUrl: Boolean(returnUrl),
+        }
       );
-    }
 
-    // =====================================================
-    // 6. RAZORPAY CONFIG
-    // =====================================================
-
-    const keyId =
-      process.env.RAZORPAY_KEY_ID;
-
-    const keySecret =
-      process.env.RAZORPAY_KEY_SECRET;
-
-    if (!keyId || !keySecret) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Razorpay server configuration is missing.",
+            "Dodo payment configuration is missing.",
         },
         { status: 500 }
       );
     }
 
     // =====================================================
-    // 7. CREATE RAZORPAY ORDER
-    // =====================================================
-
-    const razorpayResponse =
-      await fetch(
-        "https://api.razorpay.com/v1/orders",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Authorization:
-              "Basic " +
-              Buffer.from(
-                `${keyId}:${keySecret}`
-              ).toString("base64"),
-          },
-
-          body: JSON.stringify({
-            amount:
-              amountInPaise,
-
-            currency: "INR",
-
-            receipt:
-              `outbidind_bid_${listing.id.slice(
-                0,
-                20
-              )}_${Date.now()}`,
-
-            notes: {
-              payment_type:
-                "bid",
-
-              listing_id:
-                listing.id,
-
-              user_id:
-                user.id,
-
-              bid_amount:
-                String(bidAmount),
-
-              business_name:
-                listing.business_name,
-            },
-          }),
-        }
-      );
-
-    const razorpayData =
-      await razorpayResponse
-        .json()
-        .catch(() => null);
-
-    if (
-      !razorpayResponse.ok
-    ) {
-      console.error(
-        "Razorpay bid order creation failed:",
-        razorpayData
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Razorpay order creation failed.",
-        },
-        {
-          status:
-            razorpayResponse.status,
-        }
-      );
-    }
-
-    const razorpayOrderId =
-      razorpayData?.id;
-
-    if (
-      !razorpayOrderId ||
-      typeof razorpayOrderId !==
-        "string"
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Razorpay returned an invalid order.",
-        },
-        { status: 502 }
-      );
-    }
-
-    // =====================================================
-    // 8. SAVE PAYMENT ORDER
+    // 7. CHECK EXISTING PENDING PAYMENT
     // =====================================================
 
     const {
-      data: paymentOrder,
-      error: paymentError,
+      data: existingPaymentOrders,
+      error: existingPaymentError,
     } = await supabaseAdmin
       .from("payment_orders")
-      .insert({
-        listing_id:
-          listing.id,
-
-        user_id:
-          user.id,
-
-        amount:
-          bidAmount,
-
-        currency:
-          "INR",
-
-        razorpay_order_id:
-          razorpayOrderId,
-
-        status:
-          "pending",
-      })
       .select(
         `
           id,
@@ -323,105 +217,66 @@ export async function POST(
           user_id,
           amount,
           currency,
-          razorpay_order_id,
-          status
+          status,
+          created_at
         `
       )
-      .single();
+      .eq("listing_id", listing.id)
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(20);
 
-    if (
-      paymentError ||
-      !paymentOrder
-    ) {
+    if (existingPaymentError) {
       console.error(
-        "Bid payment order database error:",
-        paymentError
+        "Existing bid payment lookup error:",
+        existingPaymentError
       );
 
-      // Try to recover an order that may have
-      // actually been inserted despite an error.
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Unable to check existing payment orders.",
+        },
+        { status: 500 }
+      );
+    }
+
+    /*
+     * Reuse a pending payment only when the amount is
+     * exactly the same.
+     *
+     * A different bid amount gets a new payment order.
+     */
+    const existingPaymentOrder =
+      existingPaymentOrders?.find(
+        (order) =>
+          Number(order.amount) === bidAmount
+      );
+
+    let paymentOrderId: string;
+
+    if (existingPaymentOrder) {
+      paymentOrderId = existingPaymentOrder.id;
+    } else {
+      // ===================================================
+      // 8. CREATE LOCAL PENDING PAYMENT ORDER
+      // ===================================================
 
       const {
-        data: recoveredPaymentOrder,
-      } = await supabaseAdmin
-        .from("payment_orders")
-        .select(
-          `
-            id,
-            listing_id,
-            user_id,
-            amount,
-            currency,
-            razorpay_order_id,
-            status
-          `
-        )
-        .eq(
-          "razorpay_order_id",
-          razorpayOrderId
-        )
-        .eq(
-          "listing_id",
-          listing.id
-        )
-        .eq(
-          "user_id",
-          user.id
-        )
-        .maybeSingle();
-
-      if (
-        recoveredPaymentOrder
-      ) {
-        return NextResponse.json({
-          success: true,
-          paymentOrderId:
-            recoveredPaymentOrder.id,
-          orderId:
-            recoveredPaymentOrder.razorpay_order_id,
-          amount:
-            Math.round(
-              Number(
-                recoveredPaymentOrder.amount
-              ) * 100
-            ),
-          currency:
-            recoveredPaymentOrder.currency,
-          keyId,
-          bidAmount,
-          listingId:
-            listing.id,
-          businessName:
-            listing.business_name,
-        });
-      }
-
-      // Retry once.
-
-      const {
-        data: retryPaymentOrder,
-        error:
-          retryPaymentError,
+        data: paymentOrder,
+        error: paymentError,
       } = await supabaseAdmin
         .from("payment_orders")
         .insert({
-          listing_id:
-            listing.id,
-
-          user_id:
-            user.id,
-
-          amount:
-            bidAmount,
-
-          currency:
-            "INR",
-
-          razorpay_order_id:
-            razorpayOrderId,
-
-          status:
-            "pending",
+          listing_id: listing.id,
+          user_id: user.id,
+          amount: bidAmount,
+          currency: "INR",
+          status: "pending",
         })
         .select(
           `
@@ -430,19 +285,15 @@ export async function POST(
             user_id,
             amount,
             currency,
-            razorpay_order_id,
             status
           `
         )
         .single();
 
-      if (
-        retryPaymentError ||
-        !retryPaymentOrder
-      ) {
+      if (paymentError || !paymentOrder) {
         console.error(
-          "Bid payment order retry failed:",
-          retryPaymentError
+          "Bid payment order database error:",
+          paymentError
         );
 
         return NextResponse.json(
@@ -455,45 +306,161 @@ export async function POST(
         );
       }
 
-      return NextResponse.json({
-        success: true,
-        paymentOrderId:
-          retryPaymentOrder.id,
-        orderId:
-          retryPaymentOrder.razorpay_order_id,
-        amount:
-          razorpayData.amount,
-        currency:
-          razorpayData.currency,
-        keyId,
-        bidAmount,
-        listingId:
-          listing.id,
-        businessName:
-          listing.business_name,
-      });
+      paymentOrderId = paymentOrder.id;
+      createdPaymentOrderId = paymentOrder.id;
     }
 
     // =====================================================
-    // 9. SUCCESS
+    // 9. DODO RETURN URL
     // =====================================================
+
+    const checkoutReturnUrl = new URL(returnUrl);
+
+    checkoutReturnUrl.searchParams.set(
+      "payment",
+      "bid-return"
+    );
+
+    checkoutReturnUrl.searchParams.set(
+      "listingId",
+      listing.id
+    );
+
+    checkoutReturnUrl.searchParams.set(
+      "paymentOrderId",
+      paymentOrderId
+    );
+
+    // =====================================================
+    // 10. CREATE DODO CHECKOUT SESSION
+    // =====================================================
+
+    /*
+     * Dodo Pay What You Want must be enabled on the
+     * configured one-time product.
+     *
+     * INR amount is supplied in paise.
+     */
+    const checkoutSession =
+      await dodo.checkoutSessions.create({
+        product_cart: [
+          {
+            product_id: productId,
+            quantity: 1,
+            amount: amountInPaise,
+          },
+        ],
+
+        customer: user.email
+          ? {
+              email: user.email,
+              name:
+                user.user_metadata?.full_name ??
+                user.user_metadata?.name ??
+                user.email,
+            }
+          : undefined,
+
+        return_url:
+          checkoutReturnUrl.toString(),
+
+        metadata: {
+          payment_order_id:
+            paymentOrderId,
+
+          listing_id:
+            listing.id,
+
+          user_id:
+            user.id,
+
+          payment_type:
+            "bid",
+
+          bid_amount:
+            String(bidAmount),
+
+          business_name:
+            listing.business_name,
+        },
+      });
+
+    // =====================================================
+    // 11. GET CHECKOUT URL
+    // =====================================================
+
+    const checkoutUrl =
+      (
+        checkoutSession as {
+          checkout_url?: string;
+        }
+      ).checkout_url ??
+      (
+        checkoutSession as {
+          url?: string;
+        }
+      ).url;
+
+    if (!checkoutUrl) {
+      console.error(
+        "Dodo bid checkout session did not return a checkout URL:",
+        checkoutSession
+      );
+
+      /*
+       * If we created a brand-new local payment order
+       * and Dodo failed to create checkout, clean it up.
+       */
+      if (createdPaymentOrderId) {
+        await supabaseAdmin
+          .from("payment_orders")
+          .delete()
+          .eq(
+            "id",
+            createdPaymentOrderId
+          )
+          .eq(
+            "status",
+            "pending"
+          );
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Dodo checkout session could not be created.",
+        },
+        { status: 502 }
+      );
+    }
+
+    // =====================================================
+    // 12. SUCCESS
+    // =====================================================
+
+    console.log(
+      "Dodo bid checkout session created:",
+      {
+        paymentOrderId,
+        listingId: listing.id,
+        userId: user.id,
+        amount: bidAmount,
+      }
+    );
 
     return NextResponse.json({
       success: true,
 
-      paymentOrderId:
-        paymentOrder.id,
+      paymentOrderId,
 
-      orderId:
-        razorpayOrderId,
+      checkoutUrl,
 
       amount:
-        razorpayData.amount,
+        amountInPaise,
 
       currency:
-        razorpayData.currency,
-
-      keyId,
+        "INR",
 
       bidAmount,
 
@@ -505,9 +472,43 @@ export async function POST(
     });
   } catch (error) {
     console.error(
-      "Create bid order error:",
+      "Create Dodo bid payment error:",
       error
     );
+
+    /*
+     * Clean up only the local payment order created
+     * during this request.
+     */
+    if (createdPaymentOrderId) {
+      try {
+        const {
+          error: cleanupError,
+        } = await supabaseAdmin
+          .from("payment_orders")
+          .delete()
+          .eq(
+            "id",
+            createdPaymentOrderId
+          )
+          .eq(
+            "status",
+            "pending"
+          );
+
+        if (cleanupError) {
+          console.error(
+            "Failed to clean up bid payment order:",
+            cleanupError
+          );
+        }
+      } catch (cleanupError) {
+        console.error(
+          "Bid payment cleanup threw an error:",
+          cleanupError
+        );
+      }
+    }
 
     return NextResponse.json(
       {

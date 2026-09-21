@@ -3,64 +3,6 @@
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type RazorpayOptions = {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  handler: (response: RazorpayResponse) => void;
-
-  modal?: {
-    ondismiss?: () => void;
-  };
-
-  theme?: {
-    color?: string;
-  };
-
-  config?: {
-    display?: {
-      blocks?: {
-        upi?: {
-          name: string;
-          instruments: {
-            method: string;
-          }[];
-        };
-
-        card?: {
-          name: string;
-          instruments: {
-            method: string;
-          }[];
-        };
-      };
-
-      sequence?: string[];
-
-      preferences?: {
-        show_default_blocks?: boolean;
-      };
-    };
-  };
-};
-
-type RazorpayResponse = {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-};
-
-type RazorpayInstance = {
-  open: () => void;
-};
-
-type RazorpayConstructor = new (
-  options: RazorpayOptions
-) => RazorpayInstance;
-
 type BidFormProps = {
   listingId: string;
   currentBid: number;
@@ -78,62 +20,6 @@ export default function BidForm({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  // =====================================================
-  // LOAD RAZORPAY SCRIPT
-  // =====================================================
-
-  const loadRazorpay = async (): Promise<boolean> => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const razorpayWindow =
-      window as Window & {
-        Razorpay?: RazorpayConstructor;
-      };
-
-    if (razorpayWindow.Razorpay) {
-      return true;
-    }
-
-    return new Promise<boolean>((resolve) => {
-      const existingScript =
-        document.querySelector(
-          'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
-        );
-
-      if (existingScript) {
-        existingScript.addEventListener(
-          "load",
-          () => resolve(true),
-          { once: true }
-        );
-
-        existingScript.addEventListener(
-          "error",
-          () => resolve(false),
-          { once: true }
-        );
-
-        return;
-      }
-
-      const script =
-        document.createElement("script");
-
-      script.src =
-        "https://checkout.razorpay.com/v1/checkout.js";
-
-      script.async = true;
-
-      script.onload = () => resolve(true);
-
-      script.onerror = () => resolve(false);
-
-      document.body.appendChild(script);
-    });
-  };
 
   // =====================================================
   // SUBMIT BID
@@ -168,9 +54,9 @@ export default function BidForm({
     try {
       const supabase = createClient();
 
-      // =====================================================
+      // ===================================================
       // AUTH CHECK
-      // =====================================================
+      // ===================================================
 
       const {
         data: { user },
@@ -185,9 +71,9 @@ export default function BidForm({
         return;
       }
 
-      // =====================================================
+      // ===================================================
       // FRESH LISTING CHECK
-      // =====================================================
+      // ===================================================
 
       const {
         data: latestListing,
@@ -212,9 +98,9 @@ export default function BidForm({
         return;
       }
 
-      // =====================================================
+      // ===================================================
       // ONLY LIVE AUCTIONS CAN RECEIVE BIDS
-      // =====================================================
+      // ===================================================
 
       if (
         latestListing.listing_status !==
@@ -228,25 +114,9 @@ export default function BidForm({
         return;
       }
 
-      // =====================================================
-      // RAZORPAY SCRIPT
-      // =====================================================
-
-      const razorpayLoaded =
-        await loadRazorpay();
-
-      if (!razorpayLoaded) {
-        setError(
-          "Unable to load the payment system. Please try again."
-        );
-
-        setLoading(false);
-        return;
-      }
-
-      // =====================================================
-      // CREATE SERVER-SIDE PAYMENT ORDER
-      // =====================================================
+      // ===================================================
+      // CREATE DODO CHECKOUT SESSION
+      // ===================================================
 
       const createOrderResponse =
         await fetch(
@@ -284,255 +154,40 @@ export default function BidForm({
         return;
       }
 
-      // =====================================================
-      // RAZORPAY OPTIONS
-      // =====================================================
+      // ===================================================
+      // CHECK DODO CHECKOUT URL
+      // ===================================================
 
-      const options: RazorpayOptions = {
-        key: createOrderData.keyId,
-
-        amount: createOrderData.amount,
-
-        currency:
-          createOrderData.currency ??
-          "INR",
-
-        name: "OutbidInd",
-
-        description:
-          `Bid payment for ${
-            createOrderData.businessName ??
-            "business auction"
-          }`,
-
-        order_id:
-          createOrderData.orderId,
-
-        // ===================================================
-        // PAYMENT SUCCESS HANDLER
-        // ===================================================
-
-        handler: async (
-          response
-        ) => {
-          try {
-            setMessage(
-              "Verifying your payment..."
-            );
-
-            setError("");
-
-            // ===============================================
-            // SERVER-SIDE PAYMENT VERIFICATION
-            // ===============================================
-
-            const verifyResponse =
-              await fetch(
-                "/api/bids/verify-payment",
-                {
-                  method: "POST",
-
-                  headers: {
-                    "Content-Type":
-                      "application/json",
-                  },
-
-                  body: JSON.stringify({
-                    paymentOrderId:
-                      createOrderData.paymentOrderId,
-
-                    razorpay_payment_id:
-                      response.razorpay_payment_id,
-
-                    razorpay_order_id:
-                      response.razorpay_order_id,
-
-                    razorpay_signature:
-                      response.razorpay_signature,
-                  }),
-                }
-              );
-
-            const verifyData =
-              await verifyResponse
-                .json()
-                .catch(() => null);
-
-            // ===============================================
-            // VERIFICATION FAILED
-            // ===============================================
-
-            if (
-              !verifyResponse.ok ||
-              !verifyData?.success
-            ) {
-              setMessage("");
-
-              setError(
-                verifyData?.error ??
-                  "Payment was verified but the bid could not be completed."
-              );
-
-              setLoading(false);
-              return;
-            }
-
-            // ===============================================
-            // VERIFIED BID AMOUNT
-            // ===============================================
-
-            const verifiedBidAmount =
-              Number(
-                verifyData?.bid?.amount ??
-                  amount
-              );
-
-            // ===============================================
-            // ACCUMULATED AUCTION TOTAL
-            // ===============================================
-
-            const newCurrentBid =
-              Number(
-                verifyData?.newCurrentBid ??
-                  verifyData?.bid
-                    ?.new_current_bid ??
-                  verifyData?.bid
-                    ?.current_bid ??
-                  Number(currentBid) +
-                    verifiedBidAmount
-              );
-
-            // ===============================================
-            // SUCCESS
-            // ===============================================
-
-            setMessage(
-              `₹${verifiedBidAmount.toLocaleString(
-                "en-IN"
-              )} added to the auction total.`
-            );
-
-            setBidAmount("");
-
-            onSuccess?.(
-              newCurrentBid
-            );
-
-            setLoading(false);
-          } catch (
-            verificationError
-          ) {
-            console.error(
-              "Bid payment verification error:",
-              verificationError
-            );
-
-            setMessage("");
-
-            setError(
-              "Payment verification failed. Please try again."
-            );
-
-            setLoading(false);
-          }
-        },
-
-        // ===================================================
-        // RAZORPAY CLOSED
-        // ===================================================
-
-        modal: {
-          ondismiss: () => {
-            setMessage("");
-            setLoading(false);
-          },
-        },
-
-        // ===================================================
-        // RAZORPAY THEME
-        // ===================================================
-
-        theme: {
-          color: "#e4572e",
-        },
-
-        // ===================================================
-        // ONLY UPI + CARD
-        // ===================================================
-
-        config: {
-          display: {
-            blocks: {
-              upi: {
-                name: "Pay using UPI",
-
-                instruments: [
-                  {
-                    method: "upi",
-                  },
-                ],
-              },
-
-              card: {
-                name: "Pay using Card",
-
-                instruments: [
-                  {
-                    method: "card",
-                  },
-                ],
-              },
-            },
-
-            sequence: [
-              "block.upi",
-              "block.card",
-            ],
-
-            preferences: {
-              show_default_blocks: false,
-            },
-          },
-        },
-      };
-
-      // =====================================================
-      // GET RAZORPAY CONSTRUCTOR
-      // =====================================================
-      //
-      // IMPORTANT:
-      // We are NOT declaring window.Razorpay globally.
-      // This prevents the duplicate declaration conflict
-      // with PaymentPage.tsx.
-      //
-
-      const razorpayWindow =
-        window as Window & {
-          Razorpay?: RazorpayConstructor;
-        };
-
-      const RazorpayConstructor =
-        razorpayWindow.Razorpay;
-
-      if (!RazorpayConstructor) {
+      if (
+        !createOrderData.checkoutUrl ||
+        typeof createOrderData.checkoutUrl !==
+          "string"
+      ) {
         setError(
-          "Razorpay is not loaded. Please refresh and try again."
+          "Dodo checkout could not be opened. Please try again."
         );
 
         setLoading(false);
         return;
       }
 
-      // =====================================================
-      // OPEN RAZORPAY
-      // =====================================================
+      // ===================================================
+      // OPEN DODO CHECKOUT
+      // ===================================================
 
-      const razorpay =
-        new RazorpayConstructor(
-          options
-        );
+      setMessage(
+        "Opening secure Dodo payment..."
+      );
 
-      razorpay.open();
+      /*
+       * Dodo uses a hosted checkout page.
+       *
+       * The user completes payment there and Dodo
+       * redirects back to OutbidInd using the return URL
+       * created by the server.
+       */
+      window.location.href =
+        createOrderData.checkoutUrl;
     } catch (submitError) {
       console.error(
         "Bid submission error:",
@@ -543,6 +198,7 @@ export default function BidForm({
         "Unable to start the bid payment."
       );
 
+      setMessage("");
       setLoading(false);
     }
   }
@@ -620,7 +276,7 @@ export default function BidForm({
         </div>
       )}
 
-      {/* SUCCESS */}
+      {/* MESSAGE */}
 
       {message && (
         <div
@@ -642,7 +298,7 @@ export default function BidForm({
         className="w-full rounded-xl bg-[#e4572e] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#c94724] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading
-          ? "Processing..."
+          ? "Opening Payment..."
           : "Pay & Place Bid"}
       </button>
 

@@ -14,27 +14,47 @@ const dodo = new DodoPayments({
 
 type DodoWebhookEvent = {
   type?: string;
+
   data?: {
     payment_id?: string;
+
     metadata?: {
       payment_order_id?: string;
       listing_id?: string;
       user_id?: string;
       payment_type?: string;
+      bid_amount?: string;
+      business_name?: string;
     };
+
     [key: string]: unknown;
   };
 };
 
 export async function POST(request: Request) {
   try {
+    // =====================================================
+    // 1. READ RAW WEBHOOK BODY
+    // =====================================================
+
     const rawBody = await request.text();
 
-    const webhookId = request.headers.get("webhook-id");
+    // =====================================================
+    // 2. READ WEBHOOK HEADERS
+    // =====================================================
+
+    const webhookId =
+      request.headers.get("webhook-id");
+
     const webhookSignature =
-      request.headers.get("webhook-signature");
+      request.headers.get(
+        "webhook-signature"
+      );
+
     const webhookTimestamp =
-      request.headers.get("webhook-timestamp");
+      request.headers.get(
+        "webhook-timestamp"
+      );
 
     if (
       !webhookId ||
@@ -42,36 +62,52 @@ export async function POST(request: Request) {
       !webhookTimestamp
     ) {
       return NextResponse.json(
-        { error: "Missing webhook headers" },
+        {
+          error:
+            "Missing webhook headers",
+        },
         { status: 400 }
       );
     }
 
-    /*
-     * Verify the exact raw webhook body before parsing it.
-     */
-   const event = dodo.webhooks.unwrap(
-  rawBody,
-  {
-    headers: {
-      "webhook-id": webhookId,
-      "webhook-signature": webhookSignature,
-      "webhook-timestamp": webhookTimestamp,
-    },
-  }
-) as unknown as DodoWebhookEvent;
+    // =====================================================
+    // 3. VERIFY DODO WEBHOOK SIGNATURE
+    // =====================================================
 
-    console.log("Dodo webhook received:", {
-      id: webhookId,
-      type: event.type,
-    });
+    const event =
+      dodo.webhooks.unwrap(
+        rawBody,
+        {
+          headers: {
+            "webhook-id":
+              webhookId,
 
-    /*
-     * We only process business-listing payment events.
-     */
+            "webhook-signature":
+              webhookSignature,
+
+            "webhook-timestamp":
+              webhookTimestamp,
+          },
+        }
+      ) as unknown as DodoWebhookEvent;
+
+    console.log(
+      "Dodo webhook received:",
+      {
+        id: webhookId,
+        type: event.type,
+      }
+    );
+
+    // =====================================================
+    // 4. ONLY PAYMENT EVENTS
+    // =====================================================
+
     if (
-      event.type !== "payment.succeeded" &&
-      event.type !== "payment.failed"
+      event.type !==
+        "payment.succeeded" &&
+      event.type !==
+        "payment.failed"
     ) {
       return NextResponse.json({
         received: true,
@@ -79,37 +115,51 @@ export async function POST(request: Request) {
       });
     }
 
-    const paymentData = event.data;
+    // =====================================================
+    // 5. READ PAYMENT METADATA
+    // =====================================================
+
+    const paymentData =
+      event.data;
 
     const paymentOrderId =
-      paymentData?.metadata?.payment_order_id;
+      paymentData?.metadata
+        ?.payment_order_id;
 
     const listingId =
-      paymentData?.metadata?.listing_id;
+      paymentData?.metadata
+        ?.listing_id;
 
     const userId =
-      paymentData?.metadata?.user_id;
+      paymentData?.metadata
+        ?.user_id;
 
     const paymentType =
-      paymentData?.metadata?.payment_type;
+      paymentData?.metadata
+        ?.payment_type;
 
     const dodoPaymentId =
       paymentData?.payment_id;
 
     if (
-      paymentType !== "business_listing" ||
       !paymentOrderId ||
       !listingId ||
-      !userId
+      !userId ||
+      !paymentType
     ) {
       console.error(
-        "Dodo business-listing webhook is missing required metadata:",
+        "Dodo webhook is missing required metadata:",
         {
           webhookId,
           type: event.type,
-          hasPaymentOrderId: Boolean(paymentOrderId),
-          hasListingId: Boolean(listingId),
-          hasUserId: Boolean(userId),
+          hasPaymentOrderId:
+            Boolean(
+              paymentOrderId
+            ),
+          hasListingId:
+            Boolean(listingId),
+          hasUserId:
+            Boolean(userId),
           paymentType,
         }
       );
@@ -117,18 +167,42 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Missing or invalid business listing payment metadata.",
+            "Missing or invalid payment metadata.",
         },
         { status: 400 }
       );
     }
 
-    /*
-     * Find the local payment order.
-     *
-     * The payment_order_id comes from metadata that our own
-     * server placed into the Dodo checkout session.
-     */
+    // =====================================================
+    // 6. ONLY OUR TWO PAYMENT TYPES
+    // =====================================================
+
+    if (
+      paymentType !==
+        "business_listing" &&
+      paymentType !== "bid"
+    ) {
+      console.error(
+        "Unsupported OutbidInd payment type:",
+        {
+          webhookId,
+          paymentType,
+        }
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Unsupported payment type.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // =====================================================
+    // 7. FIND LOCAL PAYMENT ORDER
+    // =====================================================
+
     const {
       data: paymentOrder,
       error: paymentOrderError,
@@ -136,17 +210,26 @@ export async function POST(request: Request) {
       .from("payment_orders")
       .select(
         `
-        id,
-        listing_id,
-        user_id,
-        amount,
-        currency,
-        status
+          id,
+          listing_id,
+          user_id,
+          amount,
+          currency,
+          status
         `
       )
-      .eq("id", paymentOrderId)
-      .eq("listing_id", listingId)
-      .eq("user_id", userId)
+      .eq(
+        "id",
+        paymentOrderId
+      )
+      .eq(
+        "listing_id",
+        listingId
+      )
+      .eq(
+        "user_id",
+        userId
+      )
       .maybeSingle();
 
     if (paymentOrderError) {
@@ -177,32 +260,50 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         {
-          error: "Payment order not found.",
+          error:
+            "Payment order not found.",
         },
         { status: 404 }
       );
     }
 
-    /*
-     * payment.failed
-     */
-    if (event.type === "payment.failed") {
+    // =====================================================
+    // 8. PAYMENT FAILED
+    // =====================================================
+
+    if (
+      event.type ===
+      "payment.failed"
+    ) {
       /*
-       * Only move a currently pending payment to failed.
-       * This prevents a late failed event from overwriting
+       * Only pending orders are changed to failed.
+       *
+       * A late failed webhook must never overwrite
        * an already-paid order.
        */
-      if (paymentOrder.status === "pending") {
+      if (
+        paymentOrder.status ===
+        "pending"
+      ) {
         const {
-          error: failedUpdateError,
+          error:
+            failedUpdateError,
         } = await supabaseAdmin
           .from("payment_orders")
           .update({
             status: "failed",
-            updated_at: new Date().toISOString(),
+
+            updated_at:
+              new Date().toISOString(),
           })
-          .eq("id", paymentOrder.id)
-          .eq("status", "pending");
+          .eq(
+            "id",
+            paymentOrder.id
+          )
+          .eq(
+            "status",
+            "pending"
+          );
 
         if (failedUpdateError) {
           console.error(
@@ -220,10 +321,17 @@ export async function POST(request: Request) {
         }
       }
 
-      console.log("Dodo payment marked failed:", {
-        paymentOrderId: paymentOrder.id,
-        dodoPaymentId,
-      });
+      console.log(
+        "Dodo payment marked failed:",
+        {
+          paymentOrderId:
+            paymentOrder.id,
+
+          paymentType,
+
+          dodoPaymentId,
+        }
+      );
 
       return NextResponse.json({
         received: true,
@@ -231,42 +339,56 @@ export async function POST(request: Request) {
       });
     }
 
-    /*
-     * payment.succeeded
-     *
-     * If this webhook is retried after the payment was
-     * already marked paid, we still run the activation
-     * check because activation itself is idempotent.
-     */
-    if (event.type === "payment.succeeded") {
+    // =====================================================
+    // 9. PAYMENT SUCCEEDED
+    // =====================================================
+
+    if (
+      event.type ===
+      "payment.succeeded"
+    ) {
       /*
-       * Mark the local payment as paid.
+       * Mark pending payment as paid.
        *
-       * Only pending orders are transitioned here.
-       * If another webhook attempt already marked it paid,
-       * we simply continue with the activation check.
+       * This applies to BOTH:
+       *
+       * business_listing
+       * bid
        */
-      if (paymentOrder.status === "pending") {
+      if (
+        paymentOrder.status ===
+        "pending"
+      ) {
         const {
-          data: updatedPaymentOrder,
-          error: updateError,
+          data:
+            updatedPaymentOrder,
+          error:
+            updateError,
         } = await supabaseAdmin
           .from("payment_orders")
           .update({
             status: "paid",
-            updated_at: new Date().toISOString(),
+
+            updated_at:
+              new Date().toISOString(),
           })
-          .eq("id", paymentOrder.id)
-          .eq("status", "pending")
+          .eq(
+            "id",
+            paymentOrder.id
+          )
+          .eq(
+            "status",
+            "pending"
+          )
           .select(
             `
-            id,
-            listing_id,
-            user_id,
-            amount,
-            currency,
-            status,
-            updated_at
+              id,
+              listing_id,
+              user_id,
+              amount,
+              currency,
+              status,
+              updated_at
             `
           )
           .maybeSingle();
@@ -287,30 +409,38 @@ export async function POST(request: Request) {
         }
 
         /*
-         * A concurrent webhook may have changed the row
-         * between the lookup and update. Re-read the row.
+         * Concurrent webhook protection.
          */
-        if (!updatedPaymentOrder) {
+        if (
+          !updatedPaymentOrder
+        ) {
           const {
-            data: currentPaymentOrder,
-            error: currentPaymentOrderError,
+            data:
+              currentPaymentOrder,
+            error:
+              currentPaymentOrderError,
           } = await supabaseAdmin
             .from("payment_orders")
             .select(
               `
-              id,
-              listing_id,
-              user_id,
-              amount,
-              currency,
-              status,
-              updated_at
+                id,
+                listing_id,
+                user_id,
+                amount,
+                currency,
+                status,
+                updated_at
               `
             )
-            .eq("id", paymentOrder.id)
+            .eq(
+              "id",
+              paymentOrder.id
+            )
             .maybeSingle();
 
-          if (currentPaymentOrderError) {
+          if (
+            currentPaymentOrderError
+          ) {
             console.error(
               "Dodo payment order re-check error:",
               currentPaymentOrderError
@@ -326,7 +456,8 @@ export async function POST(request: Request) {
           }
 
           if (
-            currentPaymentOrder?.status !== "paid"
+            currentPaymentOrder?.status !==
+            "paid"
           ) {
             return NextResponse.json(
               {
@@ -339,29 +470,87 @@ export async function POST(request: Request) {
         }
       }
 
+      // ===================================================
+      // 10. BID PAYMENT
+      // ===================================================
+
+      if (
+        paymentType ===
+        "bid"
+      ) {
+        /*
+         * IMPORTANT:
+         *
+         * Do NOT call place_bid() here.
+         *
+         * This webhook has no authenticated browser
+         * session, while place_bid() depends on auth.uid().
+         *
+         * The authenticated client will call
+         * /api/bids/verify-payment after returning from
+         * Dodo checkout.
+         */
+        console.log(
+          "Dodo bid payment confirmed:",
+          {
+            webhookId,
+            dodoPaymentId,
+            paymentOrderId:
+              paymentOrder.id,
+            listingId:
+              paymentOrder.listing_id,
+            userId:
+              paymentOrder.user_id,
+            amount:
+              paymentOrder.amount,
+          }
+        );
+
+        return NextResponse.json({
+          received: true,
+          status: "paid",
+          paymentType: "bid",
+        });
+      }
+
+      // ===================================================
+      // 11. BUSINESS LISTING PAYMENT
+      // ===================================================
+
       /*
-       * Fetch the current listing.
+       * Everything below remains the existing
+       * business-listing activation flow.
        */
+
       const {
         data: listing,
-        error: listingLookupError,
+        error:
+          listingLookupError,
       } = await supabaseAdmin
         .from("business_listings")
         .select(
           `
-          id,
-          owner_id,
-          business_name,
-          listing_status,
-          current_bid,
-          starting_bid
+            id,
+            owner_id,
+            business_name,
+            listing_status,
+            current_bid,
+            starting_bid
           `
         )
-        .eq("id", paymentOrder.listing_id)
-        .eq("owner_id", paymentOrder.user_id)
+        .eq(
+          "id",
+          paymentOrder.listing_id
+        )
+        .eq(
+          "owner_id",
+          paymentOrder.user_id
+        )
         .maybeSingle();
 
-      if (listingLookupError) {
+      if (
+        listingLookupError
+      ) {
         console.error(
           "Dodo listing lookup error:",
           listingLookupError
@@ -380,8 +569,11 @@ export async function POST(request: Request) {
         console.error(
           "Dodo payment references missing listing:",
           {
-            paymentOrderId: paymentOrder.id,
-            listingId: paymentOrder.listing_id,
+            paymentOrderId:
+              paymentOrder.id,
+
+            listingId:
+              paymentOrder.listing_id,
           }
         );
 
@@ -394,38 +586,53 @@ export async function POST(request: Request) {
         );
       }
 
-      /*
-       * Already live:
-       * Safe retry / duplicate webhook case.
-       */
-      if (listing.listing_status === "live") {
+      // ===================================================
+      // 12. ALREADY LIVE
+      // ===================================================
+
+      if (
+        listing.listing_status ===
+        "live"
+      ) {
         console.log(
           "Dodo payment already activated listing:",
           {
-            paymentOrderId: paymentOrder.id,
-            listingId: listing.id,
+            paymentOrderId:
+              paymentOrder.id,
+
+            listingId:
+              listing.id,
           }
         );
 
         return NextResponse.json({
           received: true,
           status: "paid",
-          listingStatus: "live",
+          listingStatus:
+            "live",
           alreadyLive: true,
         });
       }
 
-      /*
-       * Preserve the existing payment rule:
-       * approved → live
-       */
-      if (listing.listing_status !== "approved") {
+      // ===================================================
+      // 13. APPROVED → LIVE
+      // ===================================================
+
+      if (
+        listing.listing_status !==
+        "approved"
+      ) {
         console.error(
           "Paid listing is not eligible for activation:",
           {
-            paymentOrderId: paymentOrder.id,
-            listingId: listing.id,
-            listingStatus: listing.listing_status,
+            paymentOrderId:
+              paymentOrder.id,
+
+            listingId:
+              listing.id,
+
+            listingStatus:
+              listing.listing_status,
           }
         );
 
@@ -438,31 +645,43 @@ export async function POST(request: Request) {
         );
       }
 
-      /*
-       * Activate the business.
-       *
-       * This is the same approved → live transition
-       * used by the previous verified-payment flow.
-       */
+      // ===================================================
+      // 14. ACTIVATE BUSINESS
+      // ===================================================
+
       const {
-        data: activatedListing,
-        error: activationError,
+        data:
+          activatedListing,
+        error:
+          activationError,
       } = await supabaseAdmin
         .from("business_listings")
         .update({
-          listing_status: "live",
-          updated_at: new Date().toISOString(),
+          listing_status:
+            "live",
+
+          updated_at:
+            new Date().toISOString(),
         })
-        .eq("id", listing.id)
-        .eq("owner_id", paymentOrder.user_id)
-        .eq("listing_status", "approved")
+        .eq(
+          "id",
+          listing.id
+        )
+        .eq(
+          "owner_id",
+          paymentOrder.user_id
+        )
+        .eq(
+          "listing_status",
+          "approved"
+        )
         .select(
           `
-          id,
-          business_name,
-          listing_status,
-          current_bid,
-          starting_bid
+            id,
+            business_name,
+            listing_status,
+            current_bid,
+            starting_bid
           `
         )
         .maybeSingle();
@@ -482,30 +701,42 @@ export async function POST(request: Request) {
         );
       }
 
-      /*
-       * If another webhook activated it first, re-read
-       * the listing and treat the result as successful.
-       */
-      if (!activatedListing) {
+      // ===================================================
+      // 15. CONCURRENT ACTIVATION CHECK
+      // ===================================================
+
+      if (
+        !activatedListing
+      ) {
         const {
-          data: currentListing,
-          error: currentListingError,
+          data:
+            currentListing,
+          error:
+            currentListingError,
         } = await supabaseAdmin
           .from("business_listings")
           .select(
             `
-            id,
-            business_name,
-            listing_status,
-            current_bid,
-            starting_bid
+              id,
+              business_name,
+              listing_status,
+              current_bid,
+              starting_bid
             `
           )
-          .eq("id", listing.id)
-          .eq("owner_id", paymentOrder.user_id)
+          .eq(
+            "id",
+            listing.id
+          )
+          .eq(
+            "owner_id",
+            paymentOrder.user_id
+          )
           .maybeSingle();
 
-        if (currentListingError) {
+        if (
+          currentListingError
+        ) {
           console.error(
             "Dodo listing re-check error:",
             currentListingError
@@ -520,7 +751,10 @@ export async function POST(request: Request) {
           );
         }
 
-        if (currentListing?.listing_status !== "live") {
+        if (
+          currentListing?.listing_status !==
+          "live"
+        ) {
           return NextResponse.json(
             {
               error:
@@ -531,19 +765,22 @@ export async function POST(request: Request) {
         }
       }
 
-      /*
-       * Get the user's email for the existing live-business
-       * notification flow.
-       */
+      // ===================================================
+      // 16. LIVE BUSINESS EMAIL
+      // ===================================================
+
       const {
         data: authUser,
-        error: authUserError,
+        error:
+          authUserError,
       } =
         await supabaseAdmin.auth.admin.getUserById(
           paymentOrder.user_id
         );
 
-      if (authUserError) {
+      if (
+        authUserError
+      ) {
         console.error(
           "Dodo user lookup for live email failed:",
           authUserError
@@ -551,39 +788,55 @@ export async function POST(request: Request) {
       }
 
       /*
-       * Email failure must NOT undo a successful payment
+       * Email failure must NOT undo successful payment
        * or listing activation.
        */
-      if (authUser?.user?.email) {
+      if (
+        authUser?.user?.email
+      ) {
         void sendLiveBusinessEmail({
-          to: authUser.user.email,
+          to:
+            authUser.user.email,
+
           businessName:
             activatedListing?.business_name ??
             listing.business_name,
-          listingId: listing.id,
-        }).catch((emailError) => {
-          console.error(
-            "Live business email failed after Dodo payment:",
-            emailError
-          );
-        });
+
+          listingId:
+            listing.id,
+        }).catch(
+          (emailError) => {
+            console.error(
+              "Live business email failed after Dodo payment:",
+              emailError
+            );
+          }
+        );
       }
 
+      // ===================================================
+      // 17. BUSINESS LISTING SUCCESS
+      // ===================================================
+
       console.log(
-        "Dodo payment successfully processed:",
+        "Dodo business listing payment successfully processed:",
         {
           webhookId,
           dodoPaymentId,
-          paymentOrderId: paymentOrder.id,
-          listingId: listing.id,
-          listingStatus: "live",
+          paymentOrderId:
+            paymentOrder.id,
+          listingId:
+            listing.id,
+          listingStatus:
+            "live",
         }
       );
 
       return NextResponse.json({
         received: true,
         status: "paid",
-        listingStatus: "live",
+        listingStatus:
+          "live",
       });
     }
 
@@ -598,7 +851,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Webhook processing failed.",
+        error:
+          "Webhook processing failed.",
       },
       { status: 500 }
     );
