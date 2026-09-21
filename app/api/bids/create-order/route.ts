@@ -314,7 +314,7 @@ export async function POST(request: Request) {
     // 9. DODO RETURN URL
     // =====================================================
 
-    const checkoutReturnUrl = new URL(returnUrl);
+    const checkoutReturnUrl = new URL("/bid-payment", returnUrl);
 
     checkoutReturnUrl.searchParams.set(
       "payment",
