@@ -216,51 +216,52 @@ export default function PrivacyPage() {
           </section>
 
           {/* 4 */}
-          <section>
-            <h2 className="text-2xl font-bold text-slate-950">
-              4. Payments
-            </h2>
+<section>
+  <h2 className="text-2xl font-bold text-slate-950">
+    4. Payments
+  </h2>
 
-            <p className="mt-4 leading-7 text-slate-600">
-              Payments on OutbidInd are processed through{" "}
-              <strong className="text-slate-900">Razorpay</strong>, a
-              third-party payment service provider.
-            </p>
+  <p className="mt-4 leading-7 text-slate-600">
+    Payments on OutbidInd are processed through{" "}
+    <strong className="text-slate-900">Dodo Payments</strong>, a
+    third-party payment service provider.
+  </p>
 
-            <p className="mt-4 leading-7 text-slate-600">
-              Razorpay may process payment information necessary to complete
-              and verify transactions. OutbidInd does not intend to store your
-              complete payment card details or banking credentials on its own
-              servers.
-            </p>
+  <p className="mt-4 leading-7 text-slate-600">
+    Dodo Payments may process payment information necessary to complete
+    and verify transactions. OutbidInd does not intend to store your
+    complete payment card details or banking credentials on its own
+    servers.
+  </p>
 
-            <p className="mt-4 leading-7 text-slate-600">
-              For payment processing, transaction verification, refunds where
-              applicable, and related activities, we may receive limited
-              transaction information such as:
-            </p>
+  <p className="mt-4 leading-7 text-slate-600">
+    For payment processing, transaction verification, refunds where
+    applicable, and related activities, we may receive limited
+    transaction information such as:
+  </p>
 
-            <ul className="mt-3 list-disc space-y-2 pl-6 leading-7 text-slate-600">
-              <li>Payment status</li>
-              <li>Transaction or order information</li>
-              <li>Razorpay payment reference or transaction ID</li>
-              <li>Payment amount</li>
-              <li>Date and time of transaction</li>
-            </ul>
+  <ul className="mt-3 list-disc space-y-2 pl-6 leading-7 text-slate-600">
+    <li>Payment status</li>
+    <li>Transaction or order information</li>
+    <li>Dodo Payments payment reference or transaction ID</li>
+    <li>Payment amount</li>
+    <li>Date and time of transaction</li>
+  </ul>
 
-            <p className="mt-4 leading-7 text-slate-600">
-              Your payment information may be handled by Razorpay in
-              accordance with Razorpay&apos;s own terms, privacy policy, and
-              security practices.
-            </p>
+  <p className="mt-4 leading-7 text-slate-600">
+    Your payment information may be handled by Dodo Payments in
+    accordance with Dodo Payments&apos; own terms, privacy policy, and
+    security practices.
+  </p>
 
-            <p className="mt-4 leading-7 text-slate-600">
-              By making a payment through OutbidInd, you acknowledge that the
-              payment transaction is processed through Razorpay and that
-              Razorpay may process the information required to complete the
-              transaction.
-            </p>
-          </section>
+  <p className="mt-4 leading-7 text-slate-600">
+    By making a payment through OutbidInd, you acknowledge that the
+    payment transaction is processed through Dodo Payments and that
+    Dodo Payments may process the information required to complete the
+    transaction.
+  </p>
+</section>
+         
 
           {/* 5 */}
           <section>
